@@ -7,3 +7,8 @@ coverage/
 .env.*
 !.env.example
 apps/server/public/
+
+# Transient tooling workspaces. Scoped narrowly so tracked Claude Code
+# configuration (e.g. .claude/settings.json) remains possible.
+.claude/worktrees/
+.superpowers/
