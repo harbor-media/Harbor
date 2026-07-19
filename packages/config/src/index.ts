@@ -5,7 +5,7 @@ const EnvSchema = z.object({
   HARBOR_PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   HARBOR_HOST: z.string().default("0.0.0.0"),
   DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
-  HARBOR_BASE_URL: z.url(),
+  HARBOR_BASE_URL: z.url({ protocol: /^https?$/ }),
   HARBOR_SECRET: z.string().min(32),
   HARBOR_DATA_DIRECTORY: z.string().default("/data"),
   HARBOR_LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),

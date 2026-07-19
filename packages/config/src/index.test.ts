@@ -28,7 +28,6 @@ describe("loadEnv", () => {
   });
 
   it("rejects a missing DATABASE_URL", () => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { DATABASE_URL: _omitted, ...rest } = valid;
     expect(() => loadEnv(rest as NodeJS.ProcessEnv)).toThrow(/DATABASE_URL/);
   });
@@ -49,5 +48,16 @@ describe("loadEnv", () => {
     expect(() =>
       loadEnv({ ...valid, HARBOR_LOG_LEVEL: "verbose" } as NodeJS.ProcessEnv),
     ).toThrow(/HARBOR_LOG_LEVEL/);
+  });
+
+  it("rejects a non-http(s) HARBOR_BASE_URL", () => {
+    expect(() =>
+      loadEnv({ ...valid, HARBOR_BASE_URL: "ftp://example.com" } as NodeJS.ProcessEnv),
+    ).toThrow(/HARBOR_BASE_URL/);
+  });
+
+  it("accepts an http HARBOR_BASE_URL", () => {
+    const env = loadEnv({ ...valid, HARBOR_BASE_URL: "http://localhost:3000" } as NodeJS.ProcessEnv);
+    expect(env.HARBOR_BASE_URL).toBe("http://localhost:3000");
   });
 });
