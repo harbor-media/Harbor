@@ -54,10 +54,6 @@ const errorsPlugin: FastifyPluginAsync = async (fastify) => {
     // neither HarborError nor a Fastify validation error, so it can be reached by
     // dependencies (@fastify/rate-limit, @fastify/static, etc.) whose messages may
     // contain internal detail such as filesystem paths or library internals.
-    // error.message is not safe to echo here: this branch handles errors that are
-    // neither HarborError nor a Fastify validation error, so it can be reached by
-    // dependencies (@fastify/rate-limit, @fastify/static, etc.) whose messages may
-    // contain internal detail such as filesystem paths or library internals.
     this.log.warn({ err: error, requestId: request.id }, "request failed");
     let code: ErrorCode;
     let message: string;
