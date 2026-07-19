@@ -9,8 +9,13 @@ services:
       HARBOR_LOG_LEVEL: ${HARBOR_LOG_LEVEL:-info}
       HARBOR_TRUST_PROXY: ${HARBOR_TRUST_PROXY:-false}
       HARBOR_DATA_DIRECTORY: /data
+    # Bound to loopback only: this keeps `docker compose up` usable for a local
+    # quick start without exposing Harbor directly on every host interface. A
+    # reverse proxy running on the same host (Dokploy, Traefik, Caddy, nginx)
+    # still reaches 127.0.0.1:3000 fine; a public VPS deployment should always
+    # terminate TLS at that proxy rather than hitting this port directly.
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       - harbor_data:/data
     depends_on:
