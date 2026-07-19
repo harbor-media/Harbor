@@ -47,6 +47,12 @@ export async function createApp(deps: AppDeps): Promise<HarborApp> {
   await app.register(context, { db: deps.db, sql: deps.sql, state: deps.state, env: deps.env });
   await app.register(errors);
 
+  // Registered at root (fastify-plugin breaks encapsulation) so both the API
+  // scope below and the static/SPA plugin can use the `rateLimit` decorator.
+  // `global: false` keeps it opt-in per route/handler rather than limiting
+  // every request by default.
+  await app.register(rateLimit, { global: false });
+
   await app.register(
     async (api) => {
       api.setNotFoundHandler((request, reply) => {
@@ -84,7 +90,6 @@ export async function createApp(deps: AppDeps): Promise<HarborApp> {
         return undefined;
       });
 
-      await api.register(rateLimit, { global: false });
       await api.register(healthRoutes);
       await api.register(installationRoutes);
     },
