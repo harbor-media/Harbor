@@ -1,49 +1,7 @@
-import type { Sql } from "@harbor/database";
 import type { HealthStatus, ReadinessStatus } from "@harbor/shared";
 import type { FastifyPluginAsync } from "fastify";
-import { isReady, READINESS_PROBE_TTL_MS, type RuntimeState } from "../../state.js";
-
-/**
- * Bound how long a hung database can make the readiness endpoint itself
- * hang. A dead-but-not-refusing connection (firewall black hole, overloaded
- * host) must still produce a prompt 503 rather than stalling the request.
- */
-const DATABASE_PROBE_TIMEOUT_MS = 2_000;
-
-async function probeDatabase(sql: Sql, timeoutMs: number): Promise<boolean> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    await Promise.race([
-      sql`select 1`,
-      new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(() => {
-          reject(new Error("database readiness probe timed out"));
-        }, timeoutMs);
-      }),
-    ]);
-    return true;
-  } catch {
-    return false;
-  } finally {
-    if (timer !== undefined) clearTimeout(timer);
-  }
-}
-
-/**
- * Refresh `state.databaseReady` from a live query when the cached result has
- * gone stale. Boot sets the readiness flags once and never revisits them, so
- * without this a database outage after boot would leave readiness reporting
- * healthy indefinitely. The result is cached for `READINESS_PROBE_TTL_MS` so
- * orchestrator polling doesn't turn into a database round-trip per request.
- */
-async function refreshDatabaseReadiness(state: RuntimeState, sql: Sql): Promise<void> {
-  const now = Date.now();
-  if (now - state.databaseProbedAt < READINESS_PROBE_TTL_MS) {
-    return;
-  }
-  state.databaseReady = await probeDatabase(sql, DATABASE_PROBE_TIMEOUT_MS);
-  state.databaseProbedAt = Date.now();
-}
+import { refreshDatabaseReadiness } from "../../database-lifecycle.js";
+import { isReady } from "../../state.js";
 
 export const healthRoutes: FastifyPluginAsync = async (fastify) => {
   // Liveness deliberately checks nothing external. A failing metadata provider
@@ -51,9 +9,9 @@ export const healthRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/health/live", async (): Promise<{ status: "ok" }> => ({ status: "ok" }));
 
   fastify.get("/health/ready", async (_request, reply): Promise<ReadinessStatus> => {
-    const { state, sql } = fastify;
+    const { state, sql, db, env, log } = fastify;
 
-    await refreshDatabaseReadiness(state, sql);
+    await refreshDatabaseReadiness(state, env, db, sql, log);
 
     const payload: ReadinessStatus = {
       ready: isReady(state),

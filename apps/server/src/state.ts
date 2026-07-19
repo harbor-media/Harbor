@@ -9,6 +9,14 @@ export interface RuntimeState {
    * trusting a stale boot-time flag.
    */
   databaseProbedAt: number;
+  /**
+   * Set while a deferred database initialization (migrations + installation
+   * row) is in flight, so concurrent in-process callers (readiness polls,
+   * the not-ready request gate) await the same attempt instead of racing
+   * duplicate migration runs. Cleared once the attempt settles, whether it
+   * succeeded or failed.
+   */
+  initPromise: Promise<void> | null;
 }
 
 /**
@@ -26,6 +34,7 @@ export function createRuntimeState(): RuntimeState {
     migrationsApplied: false,
     dataDirectoryWritable: false,
     databaseProbedAt: 0,
+    initPromise: null,
   };
 }
 

@@ -1,9 +1,9 @@
 import { access, constants, mkdir } from "node:fs/promises";
 import { loadEnv } from "@harbor/config";
-import { closeClient, createClient, ensureInstallationRow, isSetupComplete, runMigrations } from "@harbor/database";
+import { closeClient, createClient, isSetupComplete } from "@harbor/database";
 import { createLogger, type Logger } from "@harbor/logger";
 import { createApp, type HarborApp } from "./app.js";
-import { MIGRATIONS_FOLDER } from "./paths.js";
+import { connectWithRetry, ensureDatabaseInitialized } from "./database-lifecycle.js";
 import { createRuntimeState } from "./state.js";
 
 export interface Bootstrapped {
@@ -40,19 +40,24 @@ export async function bootstrap(): Promise<Bootstrapped> {
   await app.listen({ port: env.HARBOR_PORT, host: env.HARBOR_HOST });
   logger.info({ port: env.HARBOR_PORT }, "listening, readiness pending");
 
-  // 4-5. Database, then migrations under the advisory lock.
+  // 4-5. Database, retrying the initial connection with backoff, then
+  // migrations under the advisory lock. If this fails after retrying, boot
+  // continues rather than crashing the process: `ensureDatabaseInitialized`
+  // is retried from the readiness path (see database-lifecycle.ts), so a
+  // database that comes back later still lets Harbor become ready without a
+  // manual restart.
   try {
-    await sql`select 1`;
+    await connectWithRetry(sql, logger);
     state.databaseReady = true;
+    state.databaseProbedAt = Date.now();
     logger.info("database connected");
 
-    await runMigrations(env.DATABASE_URL, MIGRATIONS_FOLDER);
-    state.migrationsApplied = true;
-    logger.info("migrations applied");
-
-    await ensureInstallationRow(db);
+    await ensureDatabaseInitialized(state, env, db, logger);
   } catch (error) {
-    logger.error({ err: error }, "database initialization failed; staying not-ready");
+    logger.error(
+      { err: error },
+      "database connection failed after retries; staying not-ready until it recovers",
+    );
   }
 
   // 6. Data directory.
