@@ -12,3 +12,4 @@ apps/server/public/
 # configuration (e.g. .claude/settings.json) remains possible.
 .claude/worktrees/
 .superpowers/
+.pnpm-store/
