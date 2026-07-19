@@ -5,6 +5,7 @@ import type { Db } from "@harbor/database";
 import type { Logger } from "@harbor/logger";
 import { API_PREFIX, type ApiErrorBody } from "@harbor/shared";
 import Fastify, { type FastifyInstance, type RawServerDefault } from "fastify";
+import { healthRoutes } from "./modules/health/routes.js";
 import { context } from "./plugins/database.js";
 import { errors } from "./plugins/errors.js";
 import type { RuntimeState } from "./state.js";
@@ -39,6 +40,8 @@ export async function createApp(deps: AppDeps): Promise<HarborApp> {
         };
         void reply.status(404).send(payload);
       });
+
+      await api.register(healthRoutes);
     },
     { prefix: API_PREFIX },
   );
