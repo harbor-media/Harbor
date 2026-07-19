@@ -47,7 +47,11 @@ VOLUME ["/data"]
 USER harbor
 EXPOSE 3000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=5 \
-  CMD wget --spider --quiet http://localhost:3000/api/v1/health || exit 1
+# Probe readiness, not liveness: readiness only returns 200 once the DB is reachable,
+# migrations are applied, and /data is writable, so this reflects whether Harbor can
+# actually serve requests. Failures during start_period count as "starting", not
+# unhealthy, so the longer window just covers first-boot migrations.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=5 \
+  CMD wget --spider --quiet http://localhost:3000/api/v1/health/ready || exit 1
 
 CMD ["node", "dist/server.js"]
