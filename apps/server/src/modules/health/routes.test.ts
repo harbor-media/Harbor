@@ -47,4 +47,13 @@ describe("health endpoints", () => {
     expect(res.json()).toMatchObject({ error: { code: "NOT_FOUND" } });
     await app.close();
   });
+
+  it("returns a JSON 404 for unknown API routes even with the SPA fallback active", async () => {
+    const app = await buildTestApp({ ready: true });
+    const res = await app.inject({ method: "GET", url: "/api/v1/definitely-not-a-route" });
+    expect(res.statusCode).toBe(404);
+    expect(res.headers["content-type"]).toContain("application/json");
+    expect(res.json()).toMatchObject({ error: { code: "NOT_FOUND" } });
+    await app.close();
+  });
 });

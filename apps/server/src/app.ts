@@ -10,6 +10,7 @@ import { healthRoutes } from "./modules/health/routes.js";
 import { installationRoutes } from "./modules/installation/routes.js";
 import { context } from "./plugins/database.js";
 import { errors } from "./plugins/errors.js";
+import { staticAssets } from "./plugins/static.js";
 import type { RuntimeState } from "./state.js";
 
 export interface AppDeps {
@@ -49,6 +50,8 @@ export async function createApp(deps: AppDeps): Promise<HarborApp> {
     },
     { prefix: API_PREFIX },
   );
+
+  await app.register(staticAssets);
 
   return app;
 }
