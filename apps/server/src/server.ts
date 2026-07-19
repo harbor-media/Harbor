@@ -1,3 +1,4 @@
+import { redactSecretsFromText } from "@harbor/logger";
 import { bootstrap } from "./boot.js";
 
 const SHUTDOWN_TIMEOUT_MS = 15_000;
@@ -35,6 +36,6 @@ async function main(): Promise<void> {
 main().catch((error: unknown) => {
   // The logger may not exist yet if config validation failed, so this is the
   // one place a direct stderr write is correct.
-  process.stderr.write(`Harbor failed to start: ${String(error)}\n`);
+  process.stderr.write(`Harbor failed to start: ${redactSecretsFromText(String(error))}\n`);
   process.exit(1);
 });

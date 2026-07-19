@@ -72,3 +72,19 @@ export function createLogger(options: LoggerOptions, destination?: DestinationSt
 export function forRequest(logger: Logger, requestId: string): Logger {
   return logger.child({ requestId });
 }
+
+// This intentionally targets one concrete, documented risk: connection-string
+// userinfo (e.g. postgresql://user:pass@host/db) leaking into free-text error
+// messages written before or outside the pino logger, where key-based
+// `redact` cannot apply. It is not a general-purpose secret scanner — do not
+// extend it into a sprawling heuristic that tries to catch every conceivable
+// secret shape, since that produces false positives on ordinary error text
+// and gives a false sense of safety.
+const URL_USERINFO_PATTERN = /([a-zA-Z][a-zA-Z0-9+.-]*:\/\/)([^\s@/]+)@/g;
+
+export function redactSecretsFromText(text: string): string {
+  return text.replace(URL_USERINFO_PATTERN, (_match, scheme: string, userinfo: string) => {
+    const masked = userinfo.includes(":") ? "***:***" : "***";
+    return `${scheme}${masked}@`;
+  });
+}

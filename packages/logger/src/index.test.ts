@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createLogger, forRequest } from "./index.js";
+import { createLogger, forRequest, redactSecretsFromText } from "./index.js";
 
 function capture(): { lines: string[]; stream: { write(s: string): void } } {
   const lines: string[] = [];
@@ -89,5 +89,40 @@ describe("createLogger redaction", () => {
     const entry = JSON.parse(lines[0]!) as Record<string, unknown>;
     expect(entry["requestId"]).toBe("req-1");
     expect(entry["service"]).toBe("harbor");
+  });
+});
+
+describe("redactSecretsFromText", () => {
+  it("masks a password-bearing connection string while keeping scheme/host/port/database readable", () => {
+    const input = "connect ECONNREFUSED postgresql://harbor:s3cret@db:5432/harbor";
+    const output = redactSecretsFromText(input);
+
+    expect(output).not.toContain("s3cret");
+    expect(output).not.toContain("harbor:s3cret");
+    expect(output).toBe("connect ECONNREFUSED postgresql://***:***@db:5432/harbor");
+  });
+
+  it("masks a username-only URL", () => {
+    const input = "failed to connect: postgres://harbor@host/db";
+    const output = redactSecretsFromText(input);
+
+    expect(output).not.toContain("harbor@host");
+    expect(output).toBe("failed to connect: postgres://***@host/db");
+  });
+
+  it("masks multiple URLs in one string", () => {
+    const input =
+      "primary postgresql://harbor:s3cret@db1:5432/harbor replica postgresql://harbor:s3cret@db2:5432/harbor";
+    const output = redactSecretsFromText(input);
+
+    expect(output).not.toContain("s3cret");
+    expect(output).toBe(
+      "primary postgresql://***:***@db1:5432/harbor replica postgresql://***:***@db2:5432/harbor",
+    );
+  });
+
+  it("leaves a string with no URL completely unchanged", () => {
+    const input = "connection refused: connect ECONNREFUSED 127.0.0.1:5432";
+    expect(redactSecretsFromText(input)).toBe(input);
   });
 });

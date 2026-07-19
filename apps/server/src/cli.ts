@@ -1,6 +1,6 @@
 import { loadEnv } from "@harbor/config";
 import { runMigrations } from "@harbor/database";
-import { createLogger } from "@harbor/logger";
+import { createLogger, redactSecretsFromText } from "@harbor/logger";
 import { MIGRATIONS_FOLDER } from "./paths.js";
 
 const USAGE = "Usage: harbor <migrate>\n";
@@ -25,6 +25,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  process.stderr.write(`Migration failed: ${String(error)}\n`);
+  process.stderr.write(`Migration failed: ${redactSecretsFromText(String(error))}\n`);
   process.exit(1);
 });
