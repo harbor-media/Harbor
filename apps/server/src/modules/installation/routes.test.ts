@@ -1,10 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
+import type * as HarborDatabase from "@harbor/database";
 import { buildTestApp } from "../../test-helpers.js";
 
 vi.mock("@harbor/database", async (importOriginal) => {
-  // vi.mock's importOriginal has no other way to type the original module shape here.
-  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-  const actual = await importOriginal<typeof import("@harbor/database")>();
+  const actual = await importOriginal<typeof HarborDatabase>();
   return { ...actual, isSetupComplete: vi.fn() };
 });
 
