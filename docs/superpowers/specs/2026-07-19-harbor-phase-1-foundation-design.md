@@ -20,6 +20,9 @@ Success is a single command bringing up a working stack, the container surviving
 | Image namespace | `ghcr.io/harbor-media/harbor` | Matches the root specification; the org now exists |
 | Backend structure | Feature modules as Fastify plugins | Idiomatic Fastify, scoped injection without a DI framework, serves the modular-monolith goal |
 | Tests | Vitest units plus one Testcontainers integration test | Covers the only Phase 1 behavior that can silently corrupt an install |
+| TypeScript version | 6.0.3, not 7.0.2 | `typescript-eslint@8.64.0` requires `<6.1.0`; TS 7.0 ships no compiler API until 7.1 and its watch mode is a prototype |
+
+TypeScript 7.0.2 is the current `latest` and is 8-12x faster, but the surrounding toolchain has not caught up. Microsoft's stated compatibility rule is that code compiling cleanly under TS 6 without deprecation suppressions compiles identically under 7, so the eventual upgrade is close to free. Revisit once 7.1 restores the compiler API and typescript-eslint widens its range.
 
 Deferred packages: `api-client` (no API surface worth generating from yet), `ui` (web is a shell, no shared components), `validation` (too few schemas to justify a package; they live beside what they validate).
 
@@ -77,6 +80,8 @@ The static-asset fallback returns `index.html` for unmatched non-API paths so cl
 ## Migrations
 
 Drizzle generates SQL migration files committed to `packages/database`. The runner applies pending migrations in order inside a PostgreSQL advisory lock held for the duration, so a container that boots while another is mid-migration waits rather than racing.
+
+**The lock must run on a dedicated single connection.** `pg_advisory_lock` is session-scoped, meaning it is held by the specific connection that acquired it. Running it through the pooled application client would allow the lock and the unlock to land on different connections, silently defeating the guard. The runner therefore opens its own `postgres()` client with `max: 1`, acquires the lock, migrates, releases, and closes that client — separate from the pool the application serves requests from.
 
 The same runner is exposed two ways:
 
