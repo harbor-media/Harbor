@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createLogger } from "./index.js";
+import { createLogger, forRequest } from "./index.js";
 
 function capture(): { lines: string[]; stream: { write(s: string): void } } {
   const lines: string[] = [];
@@ -40,13 +40,10 @@ describe("createLogger redaction", () => {
     const { lines, stream } = capture();
     const log = createLogger({ level: "info", production: true }, stream);
 
-    forRequestLocal(log).info("handled");
+    forRequest(log, "req-1").info("handled");
 
     const entry = JSON.parse(lines[0]!) as Record<string, unknown>;
     expect(entry["requestId"]).toBe("req-1");
+    expect(entry["service"]).toBe("harbor");
   });
 });
-
-function forRequestLocal(log: ReturnType<typeof createLogger>) {
-  return log.child({ requestId: "req-1" });
-}
