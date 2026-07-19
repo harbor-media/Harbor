@@ -36,6 +36,50 @@ describe("createLogger redaction", () => {
     expect(entry["password"]).toBe("[REDACTED]");
   });
 
+  it("redacts compound secret key names", () => {
+    const { lines, stream } = capture();
+    const log = createLogger({ level: "info", production: true }, stream);
+
+    log.info(
+      {
+        sessionToken: "sess-tok-abc123xyz",
+        accessToken: "access-tok-def456uvw",
+        refreshToken: "refresh-tok-ghi789rst",
+        apiToken: "api-tok-jkl012pqr",
+        clientSecret: "client-secret-mno345stu",
+        hashedPassword: "$argon2id$v=19$m=65536,t=3,p=4$abc123$def456",
+        passwordHash: "bcrypt-hash-vwx789yz",
+        providerApiKey: "provider-key-abc123xyz",
+        encryptionKey: "encryption-key-def456uvw",
+        session: { refreshToken: "nested-refresh-tok-123" },
+        userId: "user-12345",
+      },
+      "authentication configured",
+    );
+
+    expect(lines).toHaveLength(1);
+    const raw = lines[0]!;
+
+    // Verify secret values do not appear
+    expect(raw).not.toContain("sess-tok-abc123xyz");
+    expect(raw).not.toContain("access-tok-def456uvw");
+    expect(raw).not.toContain("refresh-tok-ghi789rst");
+    expect(raw).not.toContain("api-tok-jkl012pqr");
+    expect(raw).not.toContain("client-secret-mno345stu");
+    expect(raw).not.toContain("$argon2id$v=19$m=65536,t=3,p=4$abc123$def456");
+    expect(raw).not.toContain("bcrypt-hash-vwx789yz");
+    expect(raw).not.toContain("provider-key-abc123xyz");
+    expect(raw).not.toContain("encryption-key-def456uvw");
+    expect(raw).not.toContain("nested-refresh-tok-123");
+
+    // Verify non-secret fields survive
+    const entry = JSON.parse(raw) as Record<string, unknown>;
+    expect(entry["msg"]).toBe("authentication configured");
+    expect(entry["userId"]).toBe("user-12345");
+    expect(entry["sessionToken"]).toBe("[REDACTED]");
+    expect(entry["accessToken"]).toBe("[REDACTED]");
+  });
+
   it("attaches a requestId via child loggers", () => {
     const { lines, stream } = capture();
     const log = createLogger({ level: "info", production: true }, stream);

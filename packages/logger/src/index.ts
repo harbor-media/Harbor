@@ -7,6 +7,11 @@ export interface LoggerOptions {
   production: boolean;
 }
 
+// Pino's redact.paths matches literal key segments, not substrings.
+// A path like "password" matches only keys named exactly "password", not "passwordHash" or "hashedPassword".
+// Compound camelCase secret field names (sessionToken, accessToken, etc.) must be added explicitly below.
+// Failure to add them here means they will appear unredacted in logs.
+// Always add both the bare form and the one-level-nested wildcard form (e.g., "sessionToken" and "*.sessionToken").
 const REDACT_PATHS = [
   "password",
   "*.password",
@@ -16,6 +21,24 @@ const REDACT_PATHS = [
   "*.secret",
   "apiKey",
   "*.apiKey",
+  "sessionToken",
+  "*.sessionToken",
+  "accessToken",
+  "*.accessToken",
+  "refreshToken",
+  "*.refreshToken",
+  "apiToken",
+  "*.apiToken",
+  "clientSecret",
+  "*.clientSecret",
+  "hashedPassword",
+  "*.hashedPassword",
+  "passwordHash",
+  "*.passwordHash",
+  "providerApiKey",
+  "*.providerApiKey",
+  "encryptionKey",
+  "*.encryptionKey",
   "DATABASE_URL",
   "*.DATABASE_URL",
   "provider.credentials.*",
