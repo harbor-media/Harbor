@@ -10,6 +10,7 @@ const EnvSchema = z.object({
   HARBOR_DATA_DIRECTORY: z.string().default("/data"),
   HARBOR_LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
   HARBOR_TRUST_PROXY: z.stringbool().default(false),
+  HARBOR_VERSION: z.string().default("0.1.0-dev"),
 });
 
 export type HarborEnv = z.infer<typeof EnvSchema>;
