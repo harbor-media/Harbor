@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
 import type { HarborEnv } from "@harbor/config";
 import type { Db, Sql } from "@harbor/database";
@@ -52,6 +53,33 @@ export async function createApp(deps: AppDeps): Promise<HarborApp> {
   // `global: false` keeps it opt-in per route/handler rather than limiting
   // every request by default.
   await app.register(rateLimit, { global: false });
+
+  // A self-hosted SPA serving only its own bundled assets: no third-party
+  // script/style/font/image origins are ever legitimate, so `default-src
+  // 'self'` needs no loosening. Vite's production build emits an external
+  // <script type="module"> and an external stylesheet, never inline script
+  // or style, so `unsafe-inline` is not required either. `frame-ancestors
+  // 'none'` (plus the legacy X-Frame-Options fallback) means Harbor can never
+  // be framed by another site. HSTS is intentionally left off: TLS
+  // terminates at the operator's reverse proxy, and Harbor has no way to
+  // know whether the connection in front of it is actually HTTPS.
+  await app.register(helmet, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'"],
+        imgSrc: ["'self'", "data:"],
+        fontSrc: ["'self'"],
+        connectSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        frameAncestors: ["'none'"],
+      },
+    },
+    frameguard: { action: "deny" },
+    hsts: false,
+  });
 
   await app.register(
     async (api) => {

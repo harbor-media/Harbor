@@ -14,6 +14,7 @@
     "migrate": "node dist/cli.js migrate"
   },
   "dependencies": {
+    "@fastify/helmet": "13.1.0",
     "@fastify/rate-limit": "11.1.0",
     "@fastify/static": "10.1.0",
     "@harbor/config": "workspace:*",
