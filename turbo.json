@@ -10,12 +10,38 @@
     },
     "lint": {},
     "test": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "env": [
+        "NODE_ENV",
+        "DATABASE_URL",
+        "HARBOR_PORT",
+        "HARBOR_HOST",
+        "HARBOR_BASE_URL",
+        "HARBOR_SECRET",
+        "HARBOR_DATA_DIRECTORY",
+        "HARBOR_LOG_LEVEL",
+        "HARBOR_TRUST_PROXY",
+        "HARBOR_VERSION",
+        "HARBOR_MIGRATIONS_DIR"
+      ]
     },
     "dev": {
       "dependsOn": ["^build"],
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "env": [
+        "NODE_ENV",
+        "DATABASE_URL",
+        "HARBOR_PORT",
+        "HARBOR_HOST",
+        "HARBOR_BASE_URL",
+        "HARBOR_SECRET",
+        "HARBOR_DATA_DIRECTORY",
+        "HARBOR_LOG_LEVEL",
+        "HARBOR_TRUST_PROXY",
+        "HARBOR_VERSION",
+        "HARBOR_MIGRATIONS_DIR"
+      ]
     }
   }
 }

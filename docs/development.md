@@ -35,18 +35,16 @@ export NODE_ENV=development
 
 (PowerShell: `$env:DATABASE_URL = "..."`, etc.)
 
-Turborepo's default `envMode` is `strict`, and this repo's `turbo.json` does
-not declare an `env` allowlist for the `dev` task, so exported variables are
-stripped unless you pass `--env-mode=loose` through to turbo:
-
-```bash
-pnpm dev --env-mode=loose
-```
+Turborepo's default `envMode` is `strict`, which strips exported shell
+variables from task environments unless a task declares them. Since Harbor
+reads configuration purely from `process.env` (no `.env` loader), `turbo.json`
+declares the variables the `dev` and `test` tasks legitimately need in each
+task's `env` array, so plain `pnpm dev` works with no extra flags.
 
 ## Running
 
 ```bash
-pnpm dev --env-mode=loose
+pnpm dev
 ```
 
 The API runs on :3000 and the web dev server on :5173 (Vite falls back to the
@@ -57,7 +55,7 @@ http://localhost:5173.
 
 | Command | Purpose |
 |---|---|
-| `pnpm dev` | Server and web with hot reload (add `--env-mode=loose`, see above) |
+| `pnpm dev` | Server and web with hot reload |
 | `pnpm build` | Build all packages |
 | `pnpm lint` | ESLint |
 | `pnpm typecheck` | TypeScript, no emit |
