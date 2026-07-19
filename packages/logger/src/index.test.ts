@@ -125,4 +125,13 @@ describe("redactSecretsFromText", () => {
     const input = "connection refused: connect ECONNREFUSED 127.0.0.1:5432";
     expect(redactSecretsFromText(input)).toBe(input);
   });
+
+  // Guards against an over-broad pattern mangling ordinary links in error
+  // messages. A URL without userinfo carries no credentials and must survive
+  // byte-for-byte, or operator-facing errors become harder to act on.
+  it("leaves URLs without credentials untouched", () => {
+    const input =
+      "migration failed; see https://harbor.example.com/docs/upgrade?from=1.0 for help";
+    expect(redactSecretsFromText(input)).toBe(input);
+  });
 });
