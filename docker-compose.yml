@@ -1,0 +1,43 @@
+services:
+  harbor:
+    image: ghcr.io/harbor-media/harbor:latest
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://harbor:${POSTGRES_PASSWORD}@postgres:5432/harbor
+      HARBOR_BASE_URL: ${HARBOR_BASE_URL}
+      HARBOR_SECRET: ${HARBOR_SECRET}
+      HARBOR_LOG_LEVEL: ${HARBOR_LOG_LEVEL:-info}
+      HARBOR_TRUST_PROXY: ${HARBOR_TRUST_PROXY:-false}
+      HARBOR_DATA_DIRECTORY: /data
+    ports:
+      - "3000:3000"
+    volumes:
+      - harbor_data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:3000/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: harbor
+      POSTGRES_USER: harbor
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - harbor_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U harbor -d harbor"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  harbor_data:
+  harbor_postgres:
