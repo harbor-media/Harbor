@@ -36,7 +36,7 @@ export async function bootstrap(): Promise<Bootstrapped> {
   const { sql, db } = createClient(env.DATABASE_URL);
 
   // 3. Bind the listener early so startup progress is observable.
-  const app = await createApp({ env, logger, db, state });
+  const app = await createApp({ env, logger, db, sql, state });
   await app.listen({ port: env.HARBOR_PORT, host: env.HARBOR_HOST });
   logger.info({ port: env.HARBOR_PORT }, "listening, readiness pending");
 

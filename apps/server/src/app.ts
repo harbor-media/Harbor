@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import rateLimit from "@fastify/rate-limit";
 import type { HarborEnv } from "@harbor/config";
-import type { Db } from "@harbor/database";
+import type { Db, Sql } from "@harbor/database";
 import type { Logger } from "@harbor/logger";
 import { API_PREFIX, type ApiErrorBody } from "@harbor/shared";
 import Fastify, { type FastifyInstance, type RawServerDefault } from "fastify";
@@ -17,6 +17,7 @@ export interface AppDeps {
   env: HarborEnv;
   logger: Logger;
   db: Db;
+  sql: Sql;
   state: RuntimeState;
 }
 
@@ -32,7 +33,7 @@ export async function createApp(deps: AppDeps): Promise<HarborApp> {
     },
   });
 
-  await app.register(context, { db: deps.db, state: deps.state, env: deps.env });
+  await app.register(context, { db: deps.db, sql: deps.sql, state: deps.state, env: deps.env });
   await app.register(errors);
 
   await app.register(

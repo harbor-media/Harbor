@@ -3,6 +3,7 @@ import postgres, { type Sql } from "postgres";
 import * as schema from "./schema.js";
 
 export type Db = PostgresJsDatabase<typeof schema>;
+export type { Sql };
 
 export interface DatabaseClient {
   sql: Sql;
