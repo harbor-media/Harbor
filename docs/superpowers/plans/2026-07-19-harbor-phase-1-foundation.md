@@ -24,7 +24,7 @@ Every task's requirements implicitly include this section.
 - **All text files use LF line endings**, enforced by `.gitattributes`. The repository is developed on Windows and built in Linux containers; CRLF leaking into shell scripts breaks the Docker image.
 - **API base path is `/api/v1`.** Internal port is `3000`.
 - **Never log secrets.** Passwords, tokens, API keys, `authorization`/`cookie` headers, and `DATABASE_URL` must never appear in log output.
-- **Every commit message** ends with the line `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`.
+- **Never add a `Co-Authored-By:` trailer or any AI-attribution footer to a commit message.** Write subject and body only, ending at the last content line.
 
 ### Known ecosystem traps (verified 2026-07-19)
 
@@ -241,9 +241,7 @@ Expected: turbo reports no packages with a `lint` task yet, exit code 0.
 
 ```bash
 git add .gitattributes .gitignore .npmrc package.json pnpm-workspace.yaml turbo.json tsconfig.base.json eslint.config.js pnpm-lock.yaml
-git commit -m "chore: scaffold pnpm/turborepo workspace
-
-Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+git commit -m "chore: scaffold pnpm/turborepo workspace"
 ```
 
 ---
@@ -434,9 +432,7 @@ Expected: PASS, 2 tests.
 
 ```bash
 git add packages/logger
-git commit -m "feat(logger): structured pino logger with secret redaction
-
-Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+git commit -m "feat(logger): structured pino logger with secret redaction"
 ```
 
 ---
@@ -594,9 +590,7 @@ Expected: PASS, 7 tests.
 
 ```bash
 git add packages/config
-git commit -m "feat(config): validated environment loading with Zod
-
-Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+git commit -m "feat(config): validated environment loading with Zod"
 ```
 
 ---
@@ -702,9 +696,7 @@ Expected: exit 0, `packages/shared/dist/index.d.ts` created.
 
 ```bash
 git add packages/shared
-git commit -m "feat(shared): API contract types and error codes
-
-Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+git commit -m "feat(shared): API contract types and error codes"
 ```
 
 ---
@@ -854,9 +846,7 @@ Expected: exit 0.
 
 ```bash
 git add packages/database
-git commit -m "feat(database): installation schema and postgres client
-
-Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+git commit -m "feat(database): installation schema and postgres client"
 ```
 
 ---
@@ -1119,9 +1109,7 @@ Expected: PASS, 3 tests. First run takes 30-60 seconds while the Postgres image 
 
 ```bash
 git add packages/database
-git commit -m "feat(database): advisory-locked migrations and setup guard
-
-Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+git commit -m "feat(database): advisory-locked migrations and setup guard"
 ```
 
 ---
@@ -1370,9 +1358,7 @@ Expected: exit 0.
 
 ```bash
 git add apps/server
-git commit -m "feat(server): composition root, context and error plugins
-
-Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+git commit -m "feat(server): composition root, context and error plugins"
 ```
 
 ---
@@ -1554,9 +1540,7 @@ Expected: PASS, 5 tests.
 
 ```bash
 git add apps/server
-git commit -m "feat(server): liveness, readiness and health summary endpoints
-
-Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+git commit -m "feat(server): liveness, readiness and health summary endpoints"
 ```
 
 ---
@@ -1717,9 +1701,7 @@ Expected: PASS, 8 tests total across both module test files.
 
 ```bash
 git add apps/server
-git commit -m "feat(server): rate-limited installation state endpoint
-
-Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+git commit -m "feat(server): rate-limited installation state endpoint"
 ```
 
 ---
@@ -1910,9 +1892,7 @@ Clean up: `docker rm -f harbor-boot-test && rm -rf .tmp-data`
 
 ```bash
 git add apps/server
-git commit -m "feat(server): boot sequence and graceful shutdown
-
-Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+git commit -m "feat(server): boot sequence and graceful shutdown"
 ```
 
 ---
@@ -1995,9 +1975,7 @@ Clean up: `docker rm -f harbor-cli-test`
 
 ```bash
 git add apps/server
-git commit -m "feat(server): CLI migrate subcommand
-
-Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+git commit -m "feat(server): CLI migrate subcommand"
 ```
 
 ---
@@ -2025,7 +2003,7 @@ Note `react-router`, not `react-router-dom` — the latter was removed in v8 and
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "dev": "vite"
   },
   "dependencies": {
@@ -2322,9 +2300,7 @@ Verify: `ls apps/server/public` shows `index.html` and `assets/`.
 
 ```bash
 git add apps/web
-git commit -m "feat(web): React shell with setup-state routing
-
-Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+git commit -m "feat(web): React shell with setup-state routing"
 ```
 
 ---
@@ -2430,9 +2406,7 @@ Boot the server as in Task 10 Step 4, then:
 
 ```bash
 git add apps/server
-git commit -m "feat(server): serve web assets with scoped SPA fallback
-
-Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+git commit -m "feat(server): serve web assets with scoped SPA fallback"
 ```
 
 ---
@@ -2541,9 +2515,7 @@ Expected: a non-zero UID, not `0`.
 
 ```bash
 git add Dockerfile .dockerignore
-git commit -m "build: multi-stage production image
-
-Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+git commit -m "build: multi-stage production image"
 ```
 
 ---
@@ -2684,9 +2656,7 @@ Clean up: `docker compose down -v && rm .env`
 
 ```bash
 git add docker-compose.yml docker-compose.dev.yml .env.example
-git commit -m "build: production and development compose stacks
-
-Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+git commit -m "build: production and development compose stacks"
 ```
 
 ---
@@ -2847,9 +2817,7 @@ Expected: ends with `SMOKE PASSED`.
 
 ```bash
 git add .github scripts
-git commit -m "ci: lint, typecheck, test, build and container smoke test
-
-Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+git commit -m "ci: lint, typecheck, test, build and container smoke test"
 ```
 
 ---
@@ -2977,9 +2945,7 @@ pnpm --filter @harbor/server migrate
 
 ```bash
 git add README.md docs/development.md
-git commit -m "docs: development setup and quick start
-
-Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+git commit -m "docs: development setup and quick start"
 ```
 
 ---
