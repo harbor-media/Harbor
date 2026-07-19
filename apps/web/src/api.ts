@@ -1,7 +1,6 @@
-export interface InstallationState {
-  setupComplete: boolean;
-  version: string;
-}
+import type { InstallationState } from "@harbor/shared";
+
+export type { InstallationState };
 
 export async function fetchInstallationState(signal: AbortSignal): Promise<InstallationState> {
   const response = await fetch("/api/v1/installation/state", { signal });
