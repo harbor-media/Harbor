@@ -5,6 +5,10 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
+    "@harbor/web#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", "../server/public/**"]
+    },
     "typecheck": {
       "dependsOn": ["^build"]
     },
