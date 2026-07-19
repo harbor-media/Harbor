@@ -1,11 +1,13 @@
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import rateLimit from "@fastify/rate-limit";
 import type { HarborEnv } from "@harbor/config";
 import type { Db } from "@harbor/database";
 import type { Logger } from "@harbor/logger";
 import { API_PREFIX, type ApiErrorBody } from "@harbor/shared";
 import Fastify, { type FastifyInstance, type RawServerDefault } from "fastify";
 import { healthRoutes } from "./modules/health/routes.js";
+import { installationRoutes } from "./modules/installation/routes.js";
 import { context } from "./plugins/database.js";
 import { errors } from "./plugins/errors.js";
 import type { RuntimeState } from "./state.js";
@@ -41,7 +43,9 @@ export async function createApp(deps: AppDeps): Promise<HarborApp> {
         void reply.status(404).send(payload);
       });
 
+      await api.register(rateLimit, { global: false });
       await api.register(healthRoutes);
+      await api.register(installationRoutes);
     },
     { prefix: API_PREFIX },
   );
