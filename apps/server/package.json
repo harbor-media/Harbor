@@ -10,7 +10,8 @@
     "lint": "eslint src",
     "test": "vitest run",
     "dev": "tsx watch src/server.ts",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "migrate": "node dist/cli.js migrate"
   },
   "dependencies": {
     "@fastify/rate-limit": "11.1.0",
