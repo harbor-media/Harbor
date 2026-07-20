@@ -9,6 +9,7 @@ import type { Logger } from "@harbor/logger";
 import { API_PREFIX, type ApiErrorBody } from "@harbor/shared";
 import Fastify, { type FastifyInstance, type RawServerDefault } from "fastify";
 import { refreshDatabaseReadiness } from "./database-lifecycle.js";
+import { authRoutes } from "./modules/auth/routes.js";
 import { healthRoutes } from "./modules/health/routes.js";
 import { installationRoutes } from "./modules/installation/routes.js";
 import { setupRoutes } from "./modules/setup/routes.js";
@@ -137,6 +138,7 @@ export async function createApp(deps: AppDeps): Promise<HarborApp> {
       await api.register(healthRoutes);
       await api.register(installationRoutes);
       await api.register(setupRoutes);
+      await api.register(authRoutes);
     },
     { prefix: API_PREFIX },
   );
