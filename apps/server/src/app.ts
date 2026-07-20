@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import fastifyCookie from "@fastify/cookie";
 import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
 import type { HarborEnv } from "@harbor/config";
@@ -10,6 +11,7 @@ import Fastify, { type FastifyInstance, type RawServerDefault } from "fastify";
 import { refreshDatabaseReadiness } from "./database-lifecycle.js";
 import { healthRoutes } from "./modules/health/routes.js";
 import { installationRoutes } from "./modules/installation/routes.js";
+import { authGuard } from "./plugins/auth.js";
 import { context } from "./plugins/database.js";
 import { errors } from "./plugins/errors.js";
 import { staticAssets } from "./plugins/static.js";
@@ -47,6 +49,13 @@ export async function createApp(deps: AppDeps): Promise<HarborApp> {
 
   await app.register(context, { db: deps.db, sql: deps.sql, state: deps.state, env: deps.env });
   await app.register(errors);
+
+  await app.register(fastifyCookie);
+  // Registered at root (fastify-plugin breaks encapsulation) so its
+  // onRequest hook installs ahead of every route, including ones added by
+  // later plugins. This is what makes the guard fail closed by default:
+  // a new route needs no opt-in to be protected.
+  await app.register(authGuard);
 
   // Registered at root (fastify-plugin breaks encapsulation) so both the API
   // scope below and the static/SPA plugin can use the `rateLimit` decorator.

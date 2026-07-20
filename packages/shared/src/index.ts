@@ -5,6 +5,7 @@ export const ERROR_CODES = [
   "SERVICE_UNAVAILABLE",
   "SETUP_ALREADY_COMPLETE",
   "RATE_LIMITED",
+  "UNAUTHENTICATED",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -69,6 +70,18 @@ export interface AuthContext {
   username: string;
   role: UserRole;
   sessionId: string;
+}
+
+/**
+ * The user identity attached to `request.user` by the authentication guard.
+ * Deliberately excludes passwordHash and every other sensitive database
+ * column: this is the only shape handlers and logs are ever allowed to see.
+ */
+export interface AuthenticatedUser {
+  id: string;
+  username: string;
+  email: string | null;
+  role: UserRole;
 }
 
 /** Request to create a new user account. */
