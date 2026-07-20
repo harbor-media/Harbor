@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type * as HarborDatabase from "@harbor/database";
-import { buildTestApp } from "../test-helpers.js";
+import { buildTestApp, createFakeSql } from "../test-helpers.js";
 
 vi.mock("@harbor/database", async (importOriginal) => {
   const actual = await importOriginal<typeof HarborDatabase>();
@@ -136,6 +136,34 @@ describe("auth guard", () => {
     // routes answer 503 SERVICE_UNAVAILABLE while starting up.
     vi.mocked(findSessionByTokenHash).mockClear();
     const app = await buildTestApp({ ready: false });
+    app.get("/api/v1/guarded", async () => ({ ok: true }));
+    await app.ready();
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/v1/guarded",
+      cookies: { harbor_session: "token" },
+    });
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toMatchObject({ error: { code: "SERVICE_UNAVAILABLE" } });
+    expect(findSessionByTokenHash).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("yields 503, not 500, when the database goes down AFTER boot (stale cached readiness)", async () => {
+    // Distinct from the cold-start case above: here `state.databaseReady` was
+    // set true at boot, exactly as it would be if Postgres restarts sometime
+    // after a successful startup. The API-scope readiness hook that would
+    // normally catch this runs AFTER the guard's root-level onRequest hook, so
+    // without its own live probe the guard would trust the stale flag, reach
+    // `findSessionByTokenHash`, hit a dead connection, and surface a raw 500 —
+    // breaking the Phase 1 contract that non-health API routes answer 503
+    // while Harbor cannot serve requests. `service-unavailable.test.ts` only
+    // covers the cold-start path on a PUBLIC route; this is the guarded-route,
+    // post-boot-outage case.
+    vi.mocked(findSessionByTokenHash).mockClear();
+    const failing = createFakeSql(true); // every probe query rejects
+    const app = await buildTestApp({ ready: true, sql: failing.sql });
     app.get("/api/v1/guarded", async () => ({ ok: true }));
     await app.ready();
 

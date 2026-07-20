@@ -2,6 +2,7 @@ import { findSessionByTokenHash, touchSession, type Session } from "@harbor/data
 import { API_PREFIX, type ApiErrorBody, type AuthenticatedUser } from "@harbor/shared";
 import fp from "fastify-plugin";
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
+import { refreshDatabaseReadiness } from "../database-lifecycle.js";
 import { SESSION_COOKIE } from "../modules/auth/cookies.js";
 import { hashSessionToken } from "../modules/auth/tokens.js";
 import { isReady } from "../state.js";
@@ -77,6 +78,21 @@ const authGuardPlugin: FastifyPluginAsync = async (fastify) => {
     // through) keeps the guard fail-closed: the request never reaches a handler.
     // Public routes are checked first, so health and readiness probes — the
     // paths that actually refresh readiness — are unaffected.
+    //
+    // `isReady` alone only reads the cached flag, which is refreshed on the API
+    // scope's readiness hook — but that hook runs AFTER this one, so a cached
+    // `databaseReady: true` from before an outage would otherwise survive long
+    // enough for the session lookup below to hit a dead connection and surface
+    // a raw 500 instead of 503. Refreshing here first closes that gap; the
+    // refresh itself is a no-op (TTL-guarded) when a probe already ran recently,
+    // so this does not add a database round-trip to every request.
+    await refreshDatabaseReadiness(
+      fastify.state,
+      fastify.env,
+      fastify.db,
+      fastify.sql,
+      request.log,
+    );
     if (!isReady(fastify.state)) return notReady(request, reply);
 
     const token = request.cookies[SESSION_COOKIE];
