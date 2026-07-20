@@ -1,7 +1,12 @@
 import { type FormEvent, type JSX, useState } from "react";
 import { useSetup } from "../auth";
 
-const USERNAME_PATTERN = "^[a-zA-Z0-9._-]+$";
+// The hyphen is escaped deliberately. Browsers compile the HTML `pattern`
+// attribute with the RegExp `v` flag, which rejects an unescaped trailing `-`
+// in a character class as "Invalid character in character class" — the whole
+// pattern is then discarded and the field silently loses client-side
+// validation. The server's Zod regex is a plain RegExp and is unaffected.
+const USERNAME_PATTERN = "^[a-zA-Z0-9._\\-]+$";
 
 export function Setup(): JSX.Element {
   const setup = useSetup();
