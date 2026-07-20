@@ -184,7 +184,9 @@ describe("POST /api/v1/auth/login", () => {
     await app.close();
   });
 
-  it("returns 429 with Retry-After once the account is throttled", async () => {
+  it("returns 429 with Retry-After for a WRONG password once the account is throttled", async () => {
+    // Throttling still applies to failures — only a correct password bypasses
+    // it (see the next test).
     vi.mocked(db.findUserByIdentifier).mockResolvedValue({
       ...user(),
       failedLoginCount: 8,
@@ -192,10 +194,30 @@ describe("POST /api/v1/auth/login", () => {
     });
     const app = await buildTestApp({ ready: true });
 
-    const res = await login({ identifier: "owner", password: PASSWORD }, app);
+    const res = await login({ identifier: "owner", password: "still-wrong" }, app);
     expect(res.statusCode).toBe(429);
     expect(res.headers["retry-after"]).toBeDefined();
     expect(Number(res.headers["retry-after"])).toBeGreaterThan(0);
+    await app.close();
+  });
+
+  it("lets a correct password through even when the account is throttled, and resets the counter", async () => {
+    // The lockout fix: a persistent per-account throttle must never be able to
+    // permanently lock out the real owner. An account far past the throttle
+    // threshold, but with the CORRECT password, must still succeed.
+    vi.mocked(db.findUserByIdentifier).mockResolvedValue({
+      ...user(),
+      failedLoginCount: 50,
+      lastFailedLoginAt: new Date(),
+    });
+    const app = await buildTestApp({ ready: true });
+
+    const res = await login({ identifier: "owner", password: PASSWORD }, app);
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ user: { username: "owner", role: "owner" } });
+    const cookie = res.cookies.find((c) => c.name === "harbor_session");
+    expect(cookie).toBeDefined();
+    expect(db.resetFailedLogins).toHaveBeenCalledOnce();
     await app.close();
   });
 
