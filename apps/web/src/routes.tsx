@@ -1,9 +1,11 @@
+import { roleRank } from "@harbor/shared";
 import { useQuery } from "@tanstack/react-query";
 import type { JSX } from "react";
 import { createBrowserRouter, Navigate, Outlet, useLocation } from "react-router";
 import { fetchInstallationState } from "./api";
 import { useCurrentUser } from "./auth";
 import { Home } from "./pages/Home";
+import { Invitations } from "./pages/Invitations";
 import { Login } from "./pages/Login";
 import { Setup } from "./pages/Setup";
 
@@ -51,6 +53,11 @@ function RootLayout(): JSX.Element {
   if (!signedIn) return onLogin ? <Outlet /> : <Navigate to="/login" replace />;
   if (onLogin) return <Navigate to="/home" replace />;
 
+  const onAdmin = location.pathname.startsWith("/admin");
+  if (onAdmin && currentUser.data && roleRank(currentUser.data.role) < roleRank("administrator")) {
+    return <Navigate to="/home" replace />;
+  }
+
   return <Outlet />;
 }
 
@@ -63,6 +70,7 @@ export const router = createBrowserRouter([
       { path: "setup", Component: Setup },
       { path: "login", Component: Login },
       { path: "home", Component: Home },
+      { path: "admin/invitations", Component: Invitations },
     ],
   },
 ]);
