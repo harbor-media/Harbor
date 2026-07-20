@@ -2,7 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import type { JSX } from "react";
 import { createBrowserRouter, Navigate, Outlet, useLocation } from "react-router";
 import { fetchInstallationState } from "./api";
+import { useCurrentUser } from "./auth";
 import { Home } from "./pages/Home";
+import { Login } from "./pages/Login";
 import { Setup } from "./pages/Setup";
 
 function useInstallationState() {
@@ -19,9 +21,10 @@ function useInstallationState() {
 
 function RootLayout(): JSX.Element {
   const location = useLocation();
-  const { data, isPending, isError } = useInstallationState();
+  const install = useInstallationState();
+  const currentUser = useCurrentUser();
 
-  if (isPending) {
+  if (install.isPending || currentUser.isPending) {
     return (
       <main className="flex min-h-screen items-center justify-center" role="status">
         Starting Harbor…
@@ -29,7 +32,7 @@ function RootLayout(): JSX.Element {
     );
   }
 
-  if (isError) {
+  if (install.isError) {
     return (
       <main className="flex min-h-screen items-center justify-center" role="alert">
         Harbor is unavailable. Check the server logs.
@@ -38,9 +41,15 @@ function RootLayout(): JSX.Element {
   }
 
   const onSetup = location.pathname === "/setup";
+  const onLogin = location.pathname === "/login";
+  const signedIn = currentUser.data !== null && currentUser.data !== undefined;
 
-  if (!data.setupComplete && !onSetup) return <Navigate to="/setup" replace />;
-  if (data.setupComplete && onSetup) return <Navigate to="/home" replace />;
+  if (!install.data.setupComplete) {
+    return onSetup ? <Outlet /> : <Navigate to="/setup" replace />;
+  }
+  if (onSetup) return <Navigate to={signedIn ? "/home" : "/login"} replace />;
+  if (!signedIn) return onLogin ? <Outlet /> : <Navigate to="/login" replace />;
+  if (onLogin) return <Navigate to="/home" replace />;
 
   return <Outlet />;
 }
@@ -52,6 +61,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, Component: () => <Navigate to="/home" replace /> },
       { path: "setup", Component: Setup },
+      { path: "login", Component: Login },
       { path: "home", Component: Home },
     ],
   },

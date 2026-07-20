@@ -97,17 +97,29 @@ export interface CreateUserResponse {
   user: User;
 }
 
-/** Request to log in. */
+/** Request to log in. `identifier` accepts a username or an email. */
 export interface LoginRequest {
-  username?: string;
-  email?: string;
+  identifier: string;
   password: string;
 }
 
 /** Response from a successful login. */
 export interface LoginResponse {
-  user: User;
-  sessionId: string;
+  user: AuthenticatedUser;
+}
+
+/** Request to complete first-run setup and create the owner account. */
+export interface SetupRequest {
+  language: string;
+  serverName: string;
+  username: string;
+  email: string;
+  password: string;
+}
+
+/** Response from completing first-run setup. */
+export interface SetupResponse {
+  user: AuthenticatedUser;
 }
 
 /** Response from password validation. */
