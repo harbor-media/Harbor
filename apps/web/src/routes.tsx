@@ -1,26 +1,14 @@
 import { roleRank } from "@harbor/shared";
-import { useQuery } from "@tanstack/react-query";
 import type { JSX } from "react";
 import { createBrowserRouter, Navigate, Outlet, useLocation } from "react-router";
-import { fetchInstallationState } from "./api";
+import { useInstallationState } from "./api";
 import { useCurrentUser } from "./auth";
 import { Home } from "./pages/Home";
 import { Invite } from "./pages/Invite";
 import { Invitations } from "./pages/Invitations";
 import { Login } from "./pages/Login";
+import { Register } from "./pages/Register";
 import { Setup } from "./pages/Setup";
-
-function useInstallationState() {
-  return useQuery({
-    queryKey: ["installation-state"],
-    queryFn: ({ signal }) => fetchInstallationState(signal),
-    staleTime: Infinity,
-    gcTime: Infinity,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-    retry: 2,
-  });
-}
 
 function RootLayout(): JSX.Element {
   const location = useLocation();
@@ -52,6 +40,11 @@ function RootLayout(): JSX.Element {
     return signedIn ? <Navigate to="/home" replace /> : <Outlet />;
   }
 
+  const onRegister = location.pathname === "/register";
+  if (onRegister) {
+    return signedIn ? <Navigate to="/home" replace /> : <Outlet />;
+  }
+
   if (!install.data.setupComplete) {
     return onSetup ? <Outlet /> : <Navigate to="/setup" replace />;
   }
@@ -76,6 +69,7 @@ export const router = createBrowserRouter([
       { path: "setup", Component: Setup },
       { path: "login", Component: Login },
       { path: "invite/:token", Component: Invite },
+      { path: "register", Component: Register },
       { path: "home", Component: Home },
       { path: "admin/invitations", Component: Invitations },
     ],

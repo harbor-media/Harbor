@@ -3,7 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@harbor/database", async (importOriginal) => {
   const actual = await importOriginal<typeof HarborDatabase>();
-  return { ...actual, isSetupComplete: vi.fn().mockResolvedValue(false) };
+  return {
+    ...actual,
+    isSetupComplete: vi.fn().mockResolvedValue(false),
+    getRegistrationMode: vi.fn().mockResolvedValue("invitation-only"),
+  };
 });
 
 const { buildTestApp } = await import("./test-helpers.js");

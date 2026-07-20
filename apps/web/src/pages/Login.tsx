@@ -1,8 +1,11 @@
 import { type FormEvent, type JSX, useState } from "react";
+import { Link } from "react-router";
+import { useInstallationState } from "../api";
 import { useLogin } from "../auth";
 
 export function Login(): JSX.Element {
   const login = useLogin();
+  const install = useInstallationState();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
 
@@ -54,6 +57,15 @@ export function Login(): JSX.Element {
         >
           {login.isPending ? "Signing in…" : "Sign in"}
         </button>
+
+        {install.data?.registrationMode === "open" && (
+          <p className="mt-4 text-center text-sm">
+            New here?{" "}
+            <Link to="/register" className="text-accent-500 hover:underline">
+              Create an account
+            </Link>
+          </p>
+        )}
       </form>
     </main>
   );

@@ -24,6 +24,7 @@ export interface ApiErrorBody {
 export interface InstallationState {
   setupComplete: boolean;
   version: string;
+  registrationMode: RegistrationMode;
 }
 
 export interface HealthStatus {
