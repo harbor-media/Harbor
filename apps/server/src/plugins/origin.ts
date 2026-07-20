@@ -33,8 +33,30 @@ const originCheckPlugin: FastifyPluginAsync<{ baseUrl: string }> = async (fastif
     if (routeUrl === undefined || !routeUrl.startsWith(API_PREFIX)) return;
 
     const headers = request.headers;
+    const rawOrigin = typeof headers.origin === "string" ? headers.origin : undefined;
+
+    // A literal `Origin: null` is itself a browser signal — sent by sandboxed
+    // iframes, some redirect chains, and file:// origins — not the absence of
+    // one. `new URL("null")` throws, so without this check it would fall
+    // through `originOf` to `null` and be treated as "no signal, allow" (the
+    // non-browser-client path below), when it is actually the opposite: a
+    // browser that has something to hide. SameSite=Lax remains the primary
+    // defence either way, so this is defence-in-depth, but a literal "null"
+    // should be rejected explicitly rather than silently allowed.
+    if (rawOrigin === "null") {
+      request.log.warn({ claimed: "null", expected }, "rejected literal null-origin request");
+      const body: ApiErrorBody = {
+        error: {
+          code: "VALIDATION_FAILED",
+          message: "Cross-origin request rejected.",
+          requestId: request.id,
+        },
+      };
+      return reply.status(403).send(body);
+    }
+
     const claimed =
-      originOf(typeof headers.origin === "string" ? headers.origin : undefined) ??
+      originOf(rawOrigin) ??
       originOf(typeof headers.referer === "string" ? headers.referer : undefined);
 
     if (claimed === null) return;

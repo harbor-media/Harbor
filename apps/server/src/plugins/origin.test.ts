@@ -101,6 +101,23 @@ describe("origin check", () => {
     await app.close();
   });
 
+  it("rejects a literal Origin: null", async () => {
+    // Sandboxed iframes and some redirect chains send the literal string
+    // "null" as Origin. `new URL("null")` throws, so a naive implementation
+    // treats this the same as a missing header (i.e. "non-browser client,
+    // allow") — but a literal "null" IS a browser signal and should be an
+    // explicit reject, not a free pass.
+    const app = await build();
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/mutating-probe",
+      cookies: COOKIES,
+      headers: { origin: "null" },
+    });
+    expect(res.statusCode).toBe(403);
+    await app.close();
+  });
+
   it("falls back to Referer when Origin is absent", async () => {
     const app = await build();
     const res = await app.inject({
