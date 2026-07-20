@@ -1,0 +1,4 @@
+.e2e-data/
+node_modules/
+playwright-report/
+test-results/

@@ -29,6 +29,11 @@
         "HARBOR_MIGRATIONS_DIR"
       ]
     },
+    "test:e2e": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "env": ["E2E_DATABASE_URL", "CI"]
+    },
     "dev": {
       "dependsOn": ["^build"],
       "cache": false,

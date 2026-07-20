@@ -60,6 +60,18 @@ export function useLogout() {
     mutationFn: async () => {
       await fetch("/api/v1/auth/logout", { method: "POST" });
     },
-    onSuccess: () => queryClient.clear(),
+    onSuccess: () => {
+      // `setQueryData` synchronously notifies every mounted observer of this
+      // query key in the same tick. `queryClient.clear()` alone was tried
+      // first, but it only guarantees the *cache entry* is gone -- an active
+      // observer with no other reason to re-render (RootLayout has no other
+      // reactive state tied to a re-render trigger here) was not reliably
+      // re-rendered by it in testing, so the post-logout redirect silently
+      // never fired even though the server-side session was correctly
+      // revoked. Explicitly writing the known post-logout value guarantees
+      // every subscriber -- including the route guard that performs the
+      // redirect -- observes it immediately.
+      queryClient.setQueryData(["current-user"], null);
+    },
   });
 }

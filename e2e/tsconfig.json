@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "moduleResolution": "bundler",
+    "module": "esnext",
+    "noEmit": true,
+    "composite": false,
+    "types": ["node"]
+  },
+  "include": ["tests", "playwright.config.ts"]
+}

@@ -11,6 +11,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
+    "test:e2e": "turbo run test:e2e",
     "docker:build": "docker build -t harbor:dev .",
     "docker:smoke": "bash scripts/smoke.sh"
   },
