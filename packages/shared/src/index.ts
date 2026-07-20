@@ -38,3 +38,66 @@ export interface ReadinessStatus {
 }
 
 export const API_PREFIX = "/api/v1";
+
+// ============================================================================
+// Authentication and User Types
+// ============================================================================
+
+/** User role in the Harbor installation. */
+export type UserRole = "owner" | "administrator" | "user" | "guest";
+
+/**
+ * Public user API type.
+ *
+ * This type explicitly lists every field that is safe to expose through the API.
+ * The database User type includes passwordHash, but that field is intentionally
+ * omitted here. This explicit approach prevents future database columns from
+ * silently appearing in API responses.
+ */
+export interface User {
+  id: string;
+  username: string;
+  email: string | null;
+  role: UserRole;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Information about the authenticated user and their session. */
+export interface AuthContext {
+  userId: string;
+  username: string;
+  role: UserRole;
+  sessionId: string;
+}
+
+/** Request to create a new user account. */
+export interface CreateUserRequest {
+  username: string;
+  email?: string;
+  password: string;
+  role?: UserRole;
+}
+
+/** Response when creating a user account. */
+export interface CreateUserResponse {
+  user: User;
+}
+
+/** Request to log in. */
+export interface LoginRequest {
+  username?: string;
+  email?: string;
+  password: string;
+}
+
+/** Response from a successful login. */
+export interface LoginResponse {
+  user: User;
+  sessionId: string;
+}
+
+/** Response from password validation. */
+export interface ValidatePasswordResponse {
+  valid: boolean;
+}
