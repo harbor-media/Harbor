@@ -9,6 +9,7 @@ import { ensureInstallationRow } from "./installation.js";
 import { createUser } from "./users.js";
 import {
   createInvitation,
+  deriveInvitationStatus,
   findInvitationByTokenHash,
   listInvitations,
   revokeInvitation,
@@ -141,5 +142,45 @@ describe("registration mode", () => {
     expect(await getRegistrationMode(db)).toBe("open");
     await setRegistrationMode(db, "disabled");
     expect(await getRegistrationMode(db)).toBe("disabled");
+  });
+});
+
+describe("deriveInvitationStatus precedence with overlapping conditions", () => {
+  it("proves revoked takes precedence over spent and expired", () => {
+    // A row that is simultaneously revoked, past expiry, and fully used
+    // must return "revoked" to prove revoked wins both checks.
+    const now = new Date();
+    const pastDate = new Date(now.getTime() - 60_000);
+
+    const result = deriveInvitationStatus(
+      {
+        revokedAt: now,
+        useCount: 5,
+        maxUses: 5,
+        expiresAt: pastDate,
+      },
+      now,
+    );
+
+    expect(result).toBe("revoked");
+  });
+
+  it("proves spent takes precedence over expired", () => {
+    // A row that is simultaneously fully used and past expiry (but not revoked)
+    // must return "spent" to prove spent wins over expired.
+    const now = new Date();
+    const pastDate = new Date(now.getTime() - 60_000);
+
+    const result = deriveInvitationStatus(
+      {
+        revokedAt: null,
+        useCount: 10,
+        maxUses: 10,
+        expiresAt: pastDate,
+      },
+      now,
+    );
+
+    expect(result).toBe("spent");
   });
 });
