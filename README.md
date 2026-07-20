@@ -8,9 +8,10 @@ service.
 
 ## Status
 
-Phase 1 (foundation) — the server boots, migrates, serves the web application,
-and reports health. There is no authentication, onboarding wizard, catalog, or
-playback yet. Those arrive in later phases.
+Phase 2a (identity core) — the server boots, migrates, completes first-run
+setup, and authenticates users with server-side sessions. Roles are stored but
+not yet enforced; invitations, user management, and profiles arrive in 2b and
+2c. There is still no catalog, playback, or media library.
 
 ## Quick start
 

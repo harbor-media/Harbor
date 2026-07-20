@@ -41,6 +41,14 @@ reads configuration purely from `process.env` (no `.env` loader), `turbo.json`
 declares the variables the `dev` and `test` tasks legitimately need in each
 task's `env` array, so plain `pnpm dev` works with no extra flags.
 
+If port 3000 is already taken on your machine, set `HARBOR_PORT` to move the
+server. When you do, also update `HARBOR_BASE_URL` to match — the origin
+check compares the incoming request's `Origin` header against
+`HARBOR_BASE_URL` on every mutating API request, and a mismatch (e.g. the
+server listening on `:3001` while `HARBOR_BASE_URL` still says `:3000`)
+silently rejects every login and setup POST as cross-origin, with no
+indication beyond a `VALIDATION_FAILED` 403.
+
 ## Running
 
 ```bash
@@ -60,6 +68,7 @@ http://localhost:5173.
 | `pnpm lint` | ESLint |
 | `pnpm typecheck` | TypeScript, no emit |
 | `pnpm test` | Vitest (database tests need Docker) |
+| `pnpm test:e2e` | Playwright end-to-end tests (needs Docker) |
 | `pnpm docker:build` | Build the production image |
 | `pnpm docker:smoke` | Run the container smoke test |
 
@@ -117,6 +126,63 @@ prepare the directory first:
 mkdir -p /path/to/harbor-data
 chown -R 100:100 /path/to/harbor-data
 ```
+
+## End-to-end tests
+
+Playwright drives a real browser against a built server on port 3100 (chosen
+to sidestep the common port-3000 conflict). The suite is self-contained:
+`pnpm test:e2e` (`e2e/scripts/run-e2e.mjs`) starts its own disposable
+PostgreSQL container, runs Playwright against a server it boots itself, and
+tears the container down afterward — no manual `docker compose` step is
+required.
+
+```bash
+pnpm build
+pnpm --filter @harbor/e2e exec playwright install chromium
+pnpm test:e2e
+```
+
+This needs a working Docker daemon (for the disposable database) and a build
+(`pnpm build`) first, since Playwright's `webServer` runs the compiled
+`apps/server/dist/server.js` rather than a dev server. The suite's first test
+is the setup wizard, so it needs a database with no owner already — the
+self-managed container starts empty on every run, so this just works.
+
+If you'd rather point the suite at a database you manage yourself — for
+example to inspect state after a run — set `E2E_DATABASE_URL` and the script
+will use it instead of starting its own container. You then own resetting
+that database between runs, since the suite still assumes no owner exists
+yet:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d
+E2E_DATABASE_URL=postgresql://harbor:harbor@localhost:5432/harbor pnpm test:e2e
+
+# reset between runs:
+docker compose -f docker-compose.dev.yml down -v
+docker compose -f docker-compose.dev.yml up -d
+```
+
+## Auth model, briefly
+
+- Passwords are hashed with Argon2id (OWASP's balanced profile).
+- Session tokens are 32 random bytes; only their SHA-256 hash is stored
+  server-side, so a database read never yields a usable token.
+- Session cookies are `HttpOnly` and `SameSite=Lax`, with `Secure` derived
+  from whether `HARBOR_BASE_URL` is `https`.
+- Login is throttled per-account and per-IP, and unknown-user vs.
+  wrong-password responses are indistinguishable, including on the throttled
+  path.
+- Mutating API requests are origin-checked against `HARBOR_BASE_URL` as a
+  second layer behind `SameSite=Lax` (see the `HARBOR_PORT` note above for the
+  most common way to trip this in local dev).
+
+## Owner setup
+
+The first account created via `POST /api/v1/setup` becomes the owner. Exactly
+one owner can ever be created — concurrent attempts produce one owner and
+leave the others to fail cleanly, and the endpoint returns `409
+SETUP_ALREADY_COMPLETE` permanently afterward.
 
 ## Notes
 
