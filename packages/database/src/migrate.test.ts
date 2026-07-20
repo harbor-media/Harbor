@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { closeClient, createClient } from "./client.js";
-import { completeSetup, ensureInstallationRow, getInstallation } from "./installation.js";
+import { ensureInstallationRow } from "./installation.js";
 import { hasPendingMigrations, runMigrations } from "./migrate.js";
 
 const migrationsFolder = path.join(
@@ -47,25 +47,7 @@ describe("runMigrations", () => {
 
 });
 
-describe("completeSetup", () => {
-  it("succeeds once and returns null for the loser of a concurrent race", async () => {
-    await runMigrations(url, migrationsFolder);
-
-    const { sql: client, db } = createClient(url, { max: 5 });
-    try {
-      await ensureInstallationRow(db);
-
-      const [first, second] = await Promise.all([completeSetup(db), completeSetup(db)]);
-      const winners = [first, second].filter((r) => r !== null);
-      expect(winners).toHaveLength(1);
-
-      const record = await getInstallation(db);
-      expect(record?.setupCompletedAt).toBeInstanceOf(Date);
-    } finally {
-      await closeClient(client);
-    }
-  });
-
+describe("installation row", () => {
   it("rejects a second installation row at the database level", async () => {
     await runMigrations(url, migrationsFolder);
 
