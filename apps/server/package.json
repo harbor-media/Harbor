@@ -24,7 +24,8 @@
     "@harbor/logger": "workspace:*",
     "@harbor/shared": "workspace:*",
     "fastify": "5.10.0",
-    "fastify-plugin": "6.0.0"
+    "fastify-plugin": "6.0.0",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@types/node": "24.13.3",

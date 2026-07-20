@@ -11,6 +11,7 @@ import Fastify, { type FastifyInstance, type RawServerDefault } from "fastify";
 import { refreshDatabaseReadiness } from "./database-lifecycle.js";
 import { healthRoutes } from "./modules/health/routes.js";
 import { installationRoutes } from "./modules/installation/routes.js";
+import { setupRoutes } from "./modules/setup/routes.js";
 import { authGuard } from "./plugins/auth.js";
 import { context } from "./plugins/database.js";
 import { errors } from "./plugins/errors.js";
@@ -135,6 +136,7 @@ export async function createApp(deps: AppDeps): Promise<HarborApp> {
 
       await api.register(healthRoutes);
       await api.register(installationRoutes);
+      await api.register(setupRoutes);
     },
     { prefix: API_PREFIX },
   );
