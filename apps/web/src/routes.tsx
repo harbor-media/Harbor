@@ -5,6 +5,7 @@ import { createBrowserRouter, Navigate, Outlet, useLocation } from "react-router
 import { fetchInstallationState } from "./api";
 import { useCurrentUser } from "./auth";
 import { Home } from "./pages/Home";
+import { Invite } from "./pages/Invite";
 import { Invitations } from "./pages/Invitations";
 import { Login } from "./pages/Login";
 import { Setup } from "./pages/Setup";
@@ -46,6 +47,11 @@ function RootLayout(): JSX.Element {
   const onLogin = location.pathname === "/login";
   const signedIn = currentUser.data !== null && currentUser.data !== undefined;
 
+  const onInvite = location.pathname.startsWith("/invite/");
+  if (onInvite) {
+    return signedIn ? <Navigate to="/home" replace /> : <Outlet />;
+  }
+
   if (!install.data.setupComplete) {
     return onSetup ? <Outlet /> : <Navigate to="/setup" replace />;
   }
@@ -69,6 +75,7 @@ export const router = createBrowserRouter([
       { index: true, Component: () => <Navigate to="/home" replace /> },
       { path: "setup", Component: Setup },
       { path: "login", Component: Login },
+      { path: "invite/:token", Component: Invite },
       { path: "home", Component: Home },
       { path: "admin/invitations", Component: Invitations },
     ],
