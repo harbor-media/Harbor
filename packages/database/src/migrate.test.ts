@@ -1,6 +1,7 @@
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { sql } from "drizzle-orm";
 import { fileURLToPath } from "node:url";
+import fs from "node:fs";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { closeClient, createClient } from "./client.js";
@@ -12,6 +13,13 @@ const migrationsFolder = path.join(
   "..",
   "drizzle",
 );
+
+// Number of migration files that will be applied to a fresh schema. Used to
+// assert the exact bookkeeping-row count below, so this must track the real
+// migrations directory rather than a hardcoded number.
+const migrationFileCount = fs
+  .readdirSync(migrationsFolder)
+  .filter((name) => name.endsWith(".sql")).length;
 
 let container: StartedPostgreSqlContainer;
 let url: string;
@@ -140,11 +148,14 @@ describe("runMigrations under a genuine fresh-schema race", () => {
 
         // The real regression signal: if the advisory lock did not hold, two
         // concurrent migrators can both observe "no rows yet" and both insert
-        // their bookkeeping row for the same migration.
+        // their bookkeeping row for the same migration. There should be
+        // exactly one bookkeeping row per migration file, never a duplicate.
         const migrations = await db.execute<{ count: string }>(sql`
           select count(*)::text as count from __drizzle_migrations
         `);
-        expect(migrations[0]?.count, `trial ${trial}: __drizzle_migrations row count`).toBe("1");
+        expect(migrations[0]?.count, `trial ${trial}: __drizzle_migrations row count`).toBe(
+          String(migrationFileCount),
+        );
       } finally {
         await closeClient(client);
       }
