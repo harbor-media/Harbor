@@ -13,6 +13,7 @@ import { refreshDatabaseReadiness } from "./database-lifecycle.js";
 import { authRoutes } from "./modules/auth/routes.js";
 import { healthRoutes } from "./modules/health/routes.js";
 import { installationRoutes } from "./modules/installation/routes.js";
+import { invitationsRoutes } from "./modules/invitations/routes.js";
 import { setupRoutes } from "./modules/setup/routes.js";
 import { authGuard } from "./plugins/auth.js";
 import { context } from "./plugins/database.js";
@@ -185,6 +186,7 @@ export async function createApp(deps: AppDeps): Promise<HarborApp> {
       await api.register(installationRoutes);
       await api.register(setupRoutes);
       await api.register(authRoutes);
+      await api.register(invitationsRoutes);
     },
     { prefix: API_PREFIX },
   );
