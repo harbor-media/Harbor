@@ -19,6 +19,15 @@ if (!databaseUrl) {
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: false,
+  // The suite shares one disposable, stateful database across every spec
+  // file (setup-and-login.spec.ts creates the owner; later files sign in as
+  // that same owner and depend on invitations/users created by earlier
+  // tests). `fullyParallel: false` only serializes tests *within* a file --
+  // Playwright still schedules separate files onto separate workers by
+  // default, which interleaves them and breaks that shared-state ordering.
+  // Pin to a single worker so the whole suite runs as one serial sequence,
+  // file order matching alphabetical `testDir` discovery.
+  workers: 1,
   forbidOnly: !!process.env["CI"],
   retries: process.env["CI"] ? 2 : 0,
   reporter: process.env["CI"] ? "list" : "html",
