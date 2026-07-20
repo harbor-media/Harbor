@@ -27,6 +27,7 @@
 **Files:**
 - Modify: `packages/shared/src/index.ts`
 - Modify: `packages/shared/package.json`
+- Modify: `packages/shared/tsconfig.json`
 - Create: `packages/shared/vitest.config.ts`
 - Test: `packages/shared/src/roles.test.ts`
 
@@ -100,6 +101,17 @@ export default defineConfig({
   test: {},
 });
 ```
+
+In `packages/shared/tsconfig.json`, add a test-file exclude so `tsc --build` does not compile the new test into `dist/` (parity with `packages/database/tsconfig.json`, which already excludes test files — this package had no tests before so it lacked the exclude). Add the `exclude` key:
+```json
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "rootDir": "src", "outDir": "dist" },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"]
+}
+```
+Match the existing `compilerOptions`/`include` already in the file — only the `"exclude"` line is new; do not overwrite other keys.
 
 In `packages/shared/src/index.ts`, extend `ERROR_CODES` (preserve `as const`) and add the role helper and contract types. Append/modify:
 ```ts
@@ -195,7 +207,7 @@ Expected: both symbols present.
 
 - [ ] **Step 5: Commit**
 ```bash
-git add packages/shared/src/index.ts packages/shared/src/roles.test.ts packages/shared/package.json packages/shared/vitest.config.ts pnpm-lock.yaml
+git add packages/shared/src/index.ts packages/shared/src/roles.test.ts packages/shared/package.json packages/shared/tsconfig.json packages/shared/vitest.config.ts pnpm-lock.yaml
 git commit -m "feat(shared): role rank helper, invitation contracts, authz error codes"
 ```
 
@@ -1032,7 +1044,7 @@ Create `apps/server/src/plugins/require-role.ts`:
 ```ts
 import { roleRank, type UserRole } from "@harbor/shared";
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { HarborError } from "../errors.js";
+import { HarborError } from "./errors.js";
 
 /**
  * Returns a Fastify preHandler that enforces a minimum role. It runs AFTER the
@@ -1227,7 +1239,7 @@ import {
 import { roleRank, type CreateInvitationResponse, type Invitation, type UserRole } from "@harbor/shared";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { HarborError } from "../../errors.js";
+import { HarborError } from "../../plugins/errors.js";
 import { generateInviteToken, hashInviteToken } from "./tokens.js";
 
 const CreateInvitationSchema = z.object({
@@ -1472,7 +1484,7 @@ import { getRegistrationMode, setRegistrationMode } from "@harbor/database";
 import type { RegistrationMode } from "@harbor/shared";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { HarborError } from "../../errors.js";
+import { HarborError } from "../../plugins/errors.js";
 import { requireRole } from "../../plugins/require-role.js";
 
 const RegistrationPatchSchema = z.object({
@@ -1616,7 +1628,7 @@ import {
 import type { InviteInspection, RegisterResponse } from "@harbor/shared";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { HarborError } from "../../errors.js";
+import { HarborError } from "../../plugins/errors.js";
 import { setSessionCookie } from "../auth/cookies.js";
 import { hashPassword } from "../auth/passwords.js";
 import { generateSessionToken, hashSessionToken, sessionExpiry } from "../auth/tokens.js";
@@ -1660,7 +1672,9 @@ export const registrationRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply): Promise<RegisterResponse> => {
       const parsed = RegisterSchema.safeParse(request.body);
       if (!parsed.success) {
-        throw new HarborError("VALIDATION_FAILED", z.prettifyError(parsed.error), 400);
+        // Generic message: this payload carries a password, so mirror the setup
+        // route's stance and do not echo field-level detail from prettifyError.
+        throw new HarborError("VALIDATION_FAILED", "Invalid registration details.", 400);
       }
       const { token, username, email, password } = parsed.data;
 
@@ -1669,13 +1683,15 @@ export const registrationRoutes: FastifyPluginAsync = async (fastify) => {
         throw new HarborError("REGISTRATION_DISABLED", "Registration is disabled.", 403);
       }
 
-      const passwordHash = await hashPassword(password);
       let user: User;
 
       if (mode === "invitation-only") {
+        // Reject a missing token BEFORE paying the ~50ms Argon2 cost, matching
+        // the setup route's "reject garbage before hashing" posture.
         if (!token) {
           throw new HarborError("INVITATION_INVALID", "A valid invitation is required.", 400);
         }
+        const passwordHash = await hashPassword(password);
         try {
           user = await redeemInvitation(fastify.db, {
             tokenHash: hashInviteToken(token),
@@ -1698,6 +1714,7 @@ export const registrationRoutes: FastifyPluginAsync = async (fastify) => {
         }
       } else {
         // open: create a user-role account with no invite.
+        const passwordHash = await hashPassword(password);
         user = await createUser(fastify.db, { username, email, passwordHash, role: "user" });
       }
 
