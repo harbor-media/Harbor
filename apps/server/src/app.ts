@@ -14,6 +14,7 @@ import { installationRoutes } from "./modules/installation/routes.js";
 import { authGuard } from "./plugins/auth.js";
 import { context } from "./plugins/database.js";
 import { errors } from "./plugins/errors.js";
+import { originCheck } from "./plugins/origin.js";
 import { staticAssets } from "./plugins/static.js";
 import { isReady, type RuntimeState } from "./state.js";
 
@@ -51,6 +52,11 @@ export async function createApp(deps: AppDeps): Promise<HarborApp> {
   await app.register(errors);
 
   await app.register(fastifyCookie);
+  // Registered before the auth guard so a rejected cross-origin mutation never
+  // reaches the session lookup: origin is checked first because it is cheap
+  // (no database access) and defends the guard's own session cookie from
+  // being ridden by a forged cross-site request in the first place.
+  await app.register(originCheck, { baseUrl: deps.env.HARBOR_BASE_URL });
   // Registered at root (fastify-plugin breaks encapsulation) so its
   // onRequest hook installs ahead of every route, including ones added by
   // later plugins. This is what makes the guard fail closed by default:
