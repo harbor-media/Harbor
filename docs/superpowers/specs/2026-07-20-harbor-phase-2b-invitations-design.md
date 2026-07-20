@@ -170,7 +170,7 @@ Two screens in 2a's dark-first placeholder style.
 
 **Admin — `/admin/invitations`** (client-side role-gated, server-side enforced): a list of existing invites with status, role, uses, and a **Revoke** button; a create form with role (dropdown showing only roles the current user may grant), optional email binding, max-uses, optional expiration. On create, the full `/invite/<token>` URL appears with a **Copy** button, shown once.
 
-**Public — `/invite/:token`**: calls inspect on load, renders "You've been invited as **user**", then a register form (username, password, email — pre-filled and locked when the invite is email-bound). Submit redeems and lands signed in on `/home`. Invalid/spent/expired tokens show "This invitation is no longer valid" rather than a form.
+**Public — `/invite/:token`**: calls inspect on load, renders "You've been invited as **user**", then a register form (username, password, email). When the invite is email-bound, the email field stays **editable with a note that a specific address is required** — the inspect endpoint deliberately never returns the bound address (that would leak whose invite it is), so the field cannot be pre-filled; the server rejects a mismatch on submit. Submit redeems and lands signed in on `/home`. Invalid/spent/expired tokens show "This invitation is no longer valid" rather than a form.
 
 **Routing:** `/invite/:token` is reachable while signed out (how new users arrive); a signed-in user hitting it is redirected to `/home`. The login screen surfaces a "Create account" link only when the mode is `open`.
 
