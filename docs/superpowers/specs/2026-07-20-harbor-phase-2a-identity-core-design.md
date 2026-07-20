@@ -229,7 +229,7 @@ Permission enforcement, invitations, and registration modes (2b). Admin user man
 3. Repeat setup attempts return `409 SETUP_ALREADY_COMPLETE`.
 4. Login and logout work; a session survives a page reload and a server restart.
 5. Every route not on the public allowlist returns 401 without a valid session, including routes added without any explicit guard.
-6. A password change invalidates every existing session for that user.
+6. The session-invalidation mechanism a password change requires (`deleteSessionsForUser`) exists and is covered by tests. 2a exposes no password-change endpoint — that arrives with user management in 2c — so the end-to-end behavior is not exercisable in this slice.
 7. Repeated failed logins return 429 with `Retry-After` and never permanently lock an account.
 8. Unknown-user and wrong-password responses are indistinguishable.
 9. Session cookies carry `HttpOnly` and `SameSite=Lax`, with `Secure` matching the base-URL protocol.
