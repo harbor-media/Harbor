@@ -30,6 +30,13 @@ export const PUBLIC_ROUTES: ReadonlySet<string> = new Set([
   // runs, leaving a stale cookie in the browser forever. The handler is
   // idempotent and reveals nothing (see Task 12).
   `POST ${API_PREFIX}/auth/logout`,
+  // Public invite inspection: matched against the ROUTE PATTERN (routeOptions.url),
+  // so the :token param appears literally here. Returns an identical negative
+  // response for every non-active token, so it reveals nothing.
+  `GET ${API_PREFIX}/invitations/:token`,
+  // Registration is public by design: invitation-only mode is bounded by needing
+  // a valid token; open mode is bounded by this route's own rate limit.
+  `POST ${API_PREFIX}/register`,
 ]);
 
 function unauthorized(request: FastifyRequest, reply: FastifyReply): FastifyReply {
