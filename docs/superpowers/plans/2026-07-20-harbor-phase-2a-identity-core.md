@@ -6,7 +6,7 @@
 
 **Architecture:** Two new tables (`users`, `sessions`) in the existing Drizzle schema. Argon2id password hashing. Opaque session tokens stored only as SHA-256 hashes. A single global `onRequest` hook authenticates every request against an exact-match public allowlist, so a route added without thought is protected by default. Owner creation and setup completion happen in one transaction, update-first, so a failure leaves the install retryable rather than bricked.
 
-**Tech Stack:** Node 24, TypeScript 6.0.3, Fastify 5.10, `@node-rs/argon2` 2.0.2, `@fastify/cookie` 11.1.2, Drizzle 0.45.2 + postgres.js, Zod 4.4.3, React 19, Vitest 4.1.10, Testcontainers 12.0.4, Playwright 1.61.1.
+**Tech Stack:** Node.js (root `engines` requires `>=22.22.0`; CI and the Docker image build on Node 24), TypeScript 6.0.3, Fastify 5.10, `@node-rs/argon2` 2.0.2, `@fastify/cookie` 11.1.2, Drizzle 0.45.2 + postgres.js, Zod 4.4.3, React 19, Vitest 4.1.10, Testcontainers 12.0.4, Playwright 1.61.1.
 
 ## Global Constraints
 
@@ -31,6 +31,7 @@
 6. **`gen_random_uuid()` is built into PostgreSQL 13+** — no `pgcrypto` extension needed on PG17.
 7. **Drizzle's `or`, `eq`, `and`, `isNull` import from the root `drizzle-orm`**, not `drizzle-orm/pg-core`.
 8. **`@playwright/test` does not bundle browsers** — CI needs `pnpm exec playwright install --with-deps chromium`.
+9. **`@node-rs/argon2@2.0.2` declares `Algorithm` as an ambient `const enum`.** `tsconfig.base.json` sets `isolatedModules: true`, which forbids importing ambient const enums (`TS2748`). Import only `hash` and `verify`, and inline the numeric value.
 
 ---
 
@@ -45,7 +46,7 @@
 | `packages/shared/src/index.ts` | `UNAUTHENTICATED` code, auth request/response contracts |
 | `apps/server/src/modules/auth/passwords.ts` | Argon2id hash/verify, dummy-hash timing defense |
 | `apps/server/src/modules/auth/tokens.ts` | Session token generation and hashing |
-| `apps/server/src/modules/auth/throttle.ts` | Backoff computation, per-IP store |
+| `apps/server/src/modules/auth/throttle.ts` | Backoff computation, bounded in-memory attempt store (per-IP and per-unknown-identifier) |
 | `apps/server/src/modules/auth/cookies.ts` | Cookie set/clear with derived `Secure` |
 | `apps/server/src/modules/auth/routes.ts` | `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` |
 | `apps/server/src/modules/setup/routes.ts` | `POST /setup` |
@@ -585,6 +586,8 @@ describe("password hashing", () => {
 
     // Guards the trap: @node-rs/argon2@2.0.2 defaults to m=4096,t=3.
     // If parameters were not passed explicitly, this assertion fails.
+    // The `$argon2id$` prefix additionally proves the inlined ARGON2ID = 2
+    // constant is the right numeric value for Argon2id.
     expect(hash.startsWith("$argon2id$")).toBe(true);
     expect(hash).toContain("m=19456");
     expect(hash).toContain("t=2");
@@ -630,7 +633,11 @@ Expected: FAIL — cannot resolve `./passwords.js`.
 
 ```ts
 import { randomBytes } from "node:crypto";
-import { Algorithm, hash, verify } from "@node-rs/argon2";
+import { hash, verify } from "@node-rs/argon2";
+
+/** Algorithm.Argon2id === 2. Inlined because @node-rs/argon2 declares Algorithm
+ *  as an ambient `const enum`, which `isolatedModules: true` forbids importing. */
+const ARGON2ID = 2;
 
 /**
  * OWASP's balanced Argon2id profile, sized for the home servers and small VPSes
@@ -644,7 +651,7 @@ const HASH_OPTIONS = {
   memoryCost: 19456,
   timeCost: 2,
   parallelism: 1,
-  algorithm: Algorithm.Argon2id,
+  algorithm: ARGON2ID,
 } as const;
 
 export async function hashPassword(password: string): Promise<string> {
@@ -806,10 +813,14 @@ git commit -m "feat(auth): session token generation and hashing"
 
 **Interfaces:**
 - Produces:
-  - `backoffMs(failedCount: number): number`
-  - `retryAfterSeconds(failedCount: number, lastFailedAt: Date | null, now?: Date): number` — 0 when not throttled
-  - `class IpThrottle` with `record(ip: string): void`, `retryAfter(ip: string, now?: Date): number`, `reset(ip: string): void`
-  - `FREE_ATTEMPTS`, `MAX_BACKOFF_MS`
+  - `backoffMs(failedCount: number, freeAttempts?: number): number`
+  - `retryAfterSeconds(failedCount, lastFailedAt: Date | null, now?: Date, freeAttempts?: number): number` — 0 when not throttled
+  - `class AttemptThrottle` with `record(key: string, now?: Date): void`, `retryAfter(key: string, now?: Date): number`, `reset(key: string): void`
+  - `identifierKey(identifier: string): string` — stable hash used to track unknown identifiers without storing them
+  - `FREE_ATTEMPTS`, `IP_FREE_ATTEMPTS`, `MAX_BACKOFF_MS`
+
+The store is keyed by an opaque string so the same bounded structure serves two
+dimensions: source IP and submitted identifier. Task 12 needs both.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -818,10 +829,12 @@ git commit -m "feat(auth): session token generation and hashing"
 ```ts
 import { describe, expect, it } from "vitest";
 import {
+  AttemptThrottle,
   FREE_ATTEMPTS,
-  IpThrottle,
+  IP_FREE_ATTEMPTS,
   MAX_BACKOFF_MS,
   backoffMs,
+  identifierKey,
   retryAfterSeconds,
 } from "./throttle.js";
 
@@ -866,37 +879,58 @@ describe("retryAfterSeconds", () => {
   });
 });
 
-describe("IpThrottle", () => {
+describe("AttemptThrottle", () => {
   const at = new Date("2026-01-01T00:00:00Z");
 
-  it("throttles only after the free attempts", () => {
-    const t = new IpThrottle();
+  it("throttles only after its free attempts", () => {
+    const t = new AttemptThrottle(FREE_ATTEMPTS);
     for (let i = 0; i < FREE_ATTEMPTS; i++) t.record("1.2.3.4", at);
     expect(t.retryAfter("1.2.3.4", at)).toBe(1);
   });
 
-  it("tracks addresses independently", () => {
-    const t = new IpThrottle();
+  it("tracks keys independently", () => {
+    const t = new AttemptThrottle(FREE_ATTEMPTS);
     for (let i = 0; i < FREE_ATTEMPTS + 2; i++) t.record("1.1.1.1", at);
     expect(t.retryAfter("1.1.1.1", at)).toBeGreaterThan(0);
     expect(t.retryAfter("2.2.2.2", at)).toBe(0);
   });
 
   it("resets on success", () => {
-    const t = new IpThrottle();
+    const t = new AttemptThrottle(FREE_ATTEMPTS);
     for (let i = 0; i < FREE_ATTEMPTS + 2; i++) t.record("9.9.9.9", at);
     t.reset("9.9.9.9");
     expect(t.retryAfter("9.9.9.9", at)).toBe(0);
   });
 
   it("evicts the oldest entries past its cap so it cannot grow unbounded", () => {
-    const t = new IpThrottle(3);
+    const t = new AttemptThrottle(FREE_ATTEMPTS, 3);
     for (const ip of ["a", "b", "c", "d"]) {
       for (let i = 0; i < FREE_ATTEMPTS + 1; i++) t.record(ip, at);
     }
     // "a" was evicted when "d" arrived, so it is no longer throttled.
     expect(t.retryAfter("a", at)).toBe(0);
     expect(t.retryAfter("d", at)).toBeGreaterThan(0);
+  });
+
+  it("gives the IP dimension a far larger budget than the account dimension", () => {
+    // Guards a self-DoS: HARBOR_TRUST_PROXY is easy to misconfigure, and when
+    // it is wrong every request appears to come from the reverse proxy. With a
+    // shared budget of 3, three bad logins anywhere would lock out the whole
+    // installation.
+    expect(IP_FREE_ATTEMPTS).toBeGreaterThan(FREE_ATTEMPTS * 5);
+
+    const t = new AttemptThrottle(IP_FREE_ATTEMPTS);
+    for (let i = 0; i < FREE_ATTEMPTS + 2; i++) t.record("10.0.0.1", at);
+    expect(t.retryAfter("10.0.0.1", at)).toBe(0);
+  });
+});
+
+describe("identifierKey", () => {
+  it("is stable, case-insensitive and never echoes the identifier", () => {
+    const key = identifierKey("Owner@Example.com ");
+    expect(key).toBe(identifierKey("owner@example.com"));
+    expect(key).not.toContain("owner");
+    expect(key).toMatch(/^[a-f0-9]{64}$/);
   });
 });
 ```
@@ -909,15 +943,30 @@ Expected: FAIL — cannot resolve `./throttle.js`.
 - [ ] **Step 3: Create `apps/server/src/modules/auth/throttle.ts`**
 
 ```ts
+import { createHash } from "node:crypto";
+
+/**
+ * The two dimensions get deliberately asymmetric budgets.
+ *
+ * FREE_ATTEMPTS guards a single account — a targeted password-guessing attack —
+ * so it is tight.
+ *
+ * IP_FREE_ATTEMPTS only blunts broad scanning, and it must stay generous
+ * because it is a self-denial-of-service vector: HARBOR_TRUST_PROXY is easy to
+ * misconfigure on a self-hosted install, and when it is wrong every request
+ * appears to originate from the reverse proxy. Sharing the tight budget would
+ * mean three bad logins from anyone locking out the entire installation.
+ */
 export const FREE_ATTEMPTS = 3;
+export const IP_FREE_ATTEMPTS = 20;
 export const BASE_BACKOFF_MS = 1000;
 export const MAX_BACKOFF_MS = 30_000;
-const DEFAULT_IP_CAPACITY = 10_000;
+const DEFAULT_CAPACITY = 10_000;
 
 /** Doubling backoff after a few free attempts, capped so nothing locks out. */
-export function backoffMs(failedCount: number): number {
-  if (failedCount < FREE_ATTEMPTS) return 0;
-  const scaled = BASE_BACKOFF_MS * 2 ** (failedCount - FREE_ATTEMPTS);
+export function backoffMs(failedCount: number, freeAttempts: number = FREE_ATTEMPTS): number {
+  if (failedCount < freeAttempts) return 0;
+  const scaled = BASE_BACKOFF_MS * 2 ** (failedCount - freeAttempts);
   return Math.min(scaled, MAX_BACKOFF_MS);
 }
 
@@ -926,44 +975,60 @@ export function retryAfterSeconds(
   failedCount: number,
   lastFailedAt: Date | null,
   now: Date = new Date(),
+  freeAttempts: number = FREE_ATTEMPTS,
 ): number {
   if (lastFailedAt === null) return 0;
-  const window = backoffMs(failedCount);
+  const window = backoffMs(failedCount, freeAttempts);
   if (window === 0) return 0;
   const remaining = lastFailedAt.getTime() + window - now.getTime();
   return remaining <= 0 ? 0 : Math.ceil(remaining / 1000);
 }
 
-interface IpEntry {
+/**
+ * Stable, non-reversible key for a submitted identifier. Tracking unknown
+ * identifiers is what lets login answer 429 identically whether or not the
+ * account exists (see Task 12); hashing means the store never holds a list of
+ * attempted usernames or email addresses in memory.
+ */
+export function identifierKey(identifier: string): string {
+  return createHash("sha256").update(identifier.trim().toLowerCase()).digest("hex");
+}
+
+interface AttemptEntry {
   count: number;
   lastFailedAt: Date;
 }
 
 /**
- * Per-IP failure tracking, deliberately in memory rather than the database:
- * a write per failed guess would itself be a denial-of-service vector. State
- * is lost on restart, which is acceptable because per-account throttling —
- * which does persist — is what defends a targeted attack.
+ * Bounded in-memory failure tracking, keyed by an opaque string so the same
+ * structure serves both the source-IP and the unknown-identifier dimension.
+ *
+ * In memory rather than the database on purpose: a write per failed guess would
+ * itself be a denial-of-service vector. State is lost on restart, which is
+ * acceptable because per-account throttling — which does persist in
+ * `users.failed_login_count` — is what defends a targeted attack.
  *
  * Capacity-bounded with oldest-first eviction so an attacker rotating source
- * addresses cannot exhaust memory.
+ * addresses or identifiers cannot exhaust memory.
  */
-export class IpThrottle {
-  readonly #entries = new Map<string, IpEntry>();
+export class AttemptThrottle {
+  readonly #entries = new Map<string, AttemptEntry>();
+  readonly #freeAttempts: number;
   readonly #capacity: number;
 
-  constructor(capacity: number = DEFAULT_IP_CAPACITY) {
+  constructor(freeAttempts: number = FREE_ATTEMPTS, capacity: number = DEFAULT_CAPACITY) {
+    this.#freeAttempts = freeAttempts;
     this.#capacity = capacity;
   }
 
-  record(ip: string, now: Date = new Date()): void {
-    const existing = this.#entries.get(ip);
+  record(key: string, now: Date = new Date()): void {
+    const existing = this.#entries.get(key);
     if (existing) {
       existing.count += 1;
       existing.lastFailedAt = now;
       // Re-insert to mark as most recently used.
-      this.#entries.delete(ip);
-      this.#entries.set(ip, existing);
+      this.#entries.delete(key);
+      this.#entries.set(key, existing);
       return;
     }
 
@@ -971,17 +1036,17 @@ export class IpThrottle {
       const oldest = this.#entries.keys().next();
       if (!oldest.done) this.#entries.delete(oldest.value);
     }
-    this.#entries.set(ip, { count: 1, lastFailedAt: now });
+    this.#entries.set(key, { count: 1, lastFailedAt: now });
   }
 
-  retryAfter(ip: string, now: Date = new Date()): number {
-    const entry = this.#entries.get(ip);
+  retryAfter(key: string, now: Date = new Date()): number {
+    const entry = this.#entries.get(key);
     if (!entry) return 0;
-    return retryAfterSeconds(entry.count, entry.lastFailedAt, now);
+    return retryAfterSeconds(entry.count, entry.lastFailedAt, now, this.#freeAttempts);
   }
 
-  reset(ip: string): void {
-    this.#entries.delete(ip);
+  reset(key: string): void {
+    this.#entries.delete(key);
   }
 }
 ```
@@ -989,7 +1054,7 @@ export class IpThrottle {
 - [ ] **Step 4: Run tests**
 
 Run: `pnpm --filter @harbor/server test throttle`
-Expected: PASS, 12 tests.
+Expected: PASS, 14 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -1131,7 +1196,6 @@ This is the most important test in Phase 2a. It is the executable form of the fa
 `apps/server/src/plugins/auth.test.ts`:
 
 ```ts
-import type { Db } from "@harbor/database";
 import { describe, expect, it, vi } from "vitest";
 import type * as HarborDatabase from "@harbor/database";
 import { buildTestApp } from "../test-helpers.js";
@@ -1262,6 +1326,27 @@ describe("auth guard", () => {
     expect(res.statusCode).not.toBe(401);
     await app.close();
   });
+
+  it("yields 503, not 500, when Harbor is not ready and a cookie is present", async () => {
+    // The guard runs at root, ahead of the API scope's readiness gate. Without
+    // its own readiness check it would query a database that may be down and
+    // surface INTERNAL_ERROR, breaking the Phase 1 contract that non-health API
+    // routes answer 503 SERVICE_UNAVAILABLE while starting up.
+    vi.mocked(findSessionByTokenHash).mockClear();
+    const app = await buildTestApp({ ready: false });
+    app.get("/api/v1/guarded", async () => ({ ok: true }));
+    await app.ready();
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/v1/guarded",
+      cookies: { harbor_session: "token" },
+    });
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toMatchObject({ error: { code: "SERVICE_UNAVAILABLE" } });
+    expect(findSessionByTokenHash).not.toHaveBeenCalled();
+    await app.close();
+  });
 });
 ```
 
@@ -1279,6 +1364,7 @@ import fp from "fastify-plugin";
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
 import { SESSION_COOKIE } from "../modules/auth/cookies.js";
 import { hashSessionToken } from "../modules/auth/tokens.js";
+import { isReady } from "../state.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -1298,6 +1384,11 @@ export const PUBLIC_ROUTES: ReadonlySet<string> = new Set([
   `GET ${API_PREFIX}/installation/state`,
   `POST ${API_PREFIX}/setup`,
   `POST ${API_PREFIX}/auth/login`,
+  // Logout is public on purpose: an expired or already-revoked session must
+  // still be able to clear its cookie. Guarding it would 401 before the handler
+  // runs, leaving a stale cookie in the browser forever. The handler is
+  // idempotent and reveals nothing (see Task 12).
+  `POST ${API_PREFIX}/auth/logout`,
 ]);
 
 function unauthorized(request: FastifyRequest, reply: FastifyReply): FastifyReply {
@@ -1309,6 +1400,17 @@ function unauthorized(request: FastifyRequest, reply: FastifyReply): FastifyRepl
     },
   };
   return reply.status(401).send(body);
+}
+
+function notReady(request: FastifyRequest, reply: FastifyReply): FastifyReply {
+  const body: ApiErrorBody = {
+    error: {
+      code: "SERVICE_UNAVAILABLE",
+      message: "Harbor is starting up. Try again shortly.",
+      requestId: request.id,
+    },
+  };
+  return reply.status(503).send(body);
 }
 
 const authGuardPlugin: FastifyPluginAsync = async (fastify) => {
@@ -1326,6 +1428,16 @@ const authGuardPlugin: FastifyPluginAsync = async (fastify) => {
     if (!routeUrl.startsWith(API_PREFIX)) return;
 
     if (PUBLIC_ROUTES.has(`${request.method} ${routeUrl}`)) return;
+
+    // This plugin is registered at root, so its hook runs BEFORE the API
+    // scope's readiness gate. Without this check the session lookup below would
+    // hit a database that may be unreachable or unmigrated and surface a 500,
+    // overriding Phase 1's contract that non-health API routes answer 503 while
+    // Harbor is starting. Returning the reply here (rather than falling
+    // through) keeps the guard fail-closed: the request never reaches a handler.
+    // Public routes are checked first, so health and readiness probes — the
+    // paths that actually refresh readiness — are unaffected.
+    if (!isReady(fastify.state)) return notReady(request, reply);
 
     const token = request.cookies[SESSION_COOKIE];
     if (!token) return unauthorized(request, reply);
@@ -1376,7 +1488,7 @@ Place these immediately after the `errors` plugin registration and before `app.r
 - [ ] **Step 5: Run tests**
 
 Run: `pnpm --filter @harbor/server test`
-Expected: PASS — 6 new guard tests plus all pre-existing tests.
+Expected: PASS — 7 new guard tests plus all pre-existing tests.
 
 - [ ] **Step 6: Commit**
 
@@ -1400,17 +1512,59 @@ git commit -m "feat(auth): fail-closed authentication guard"
 
 `apps/server/src/plugins/origin.test.ts`:
 
+The probe route is not on the public allowlist, so the auth guard would answer
+401 before the origin check ever mattered — and `not.toBe(403)` is satisfied by
+a 401, which would let the whole allow-branch of `origin.ts` be deleted with the
+suite still green. So this file mocks a valid session, sends the cookie, and
+asserts a hard `200` on the allow paths.
+
 ```ts
-import { describe, expect, it } from "vitest";
+import type * as HarborDatabase from "@harbor/database";
+import { describe, expect, it, vi } from "vitest";
 import { buildTestApp } from "../test-helpers.js";
+
+vi.mock("@harbor/database", async (importOriginal) => {
+  const actual = await importOriginal<typeof HarborDatabase>();
+  return { ...actual, findSessionByTokenHash: vi.fn(), touchSession: vi.fn() };
+});
+
+const { findSessionByTokenHash } = await import("@harbor/database");
+
+const SESSION_USER = {
+  id: "11111111-1111-1111-1111-111111111111",
+  username: "owner",
+  email: "owner@example.com",
+  role: "owner" as const,
+  passwordHash: "x",
+  passwordChangedAt: new Date(),
+  failedLoginCount: 0,
+  lastFailedLoginAt: null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
 
 // testEnv sets HARBOR_BASE_URL to http://localhost:3000
 async function build() {
+  vi.mocked(findSessionByTokenHash).mockResolvedValue({
+    session: {
+      id: "22222222-2222-2222-2222-222222222222",
+      userId: SESSION_USER.id,
+      tokenHash: "hash",
+      expiresAt: new Date(Date.now() + 60_000),
+      lastSeenAt: new Date(),
+      userAgent: null,
+      ip: null,
+      createdAt: new Date(),
+    },
+    user: SESSION_USER,
+  });
   const app = await buildTestApp({ ready: true });
   app.post("/api/v1/mutating-probe", async () => ({ ok: true }));
   await app.ready();
   return app;
 }
+
+const COOKIES = { harbor_session: "token" };
 
 describe("origin check", () => {
   it("allows a same-origin mutating request", async () => {
@@ -1418,9 +1572,10 @@ describe("origin check", () => {
     const res = await app.inject({
       method: "POST",
       url: "/api/v1/mutating-probe",
+      cookies: COOKIES,
       headers: { origin: "http://localhost:3000" },
     });
-    expect(res.statusCode).not.toBe(403);
+    expect(res.statusCode).toBe(200);
     await app.close();
   });
 
@@ -1429,6 +1584,7 @@ describe("origin check", () => {
     const res = await app.inject({
       method: "POST",
       url: "/api/v1/mutating-probe",
+      cookies: COOKIES,
       headers: { origin: "https://evil.example.com" },
     });
     expect(res.statusCode).toBe(403);
@@ -1439,8 +1595,12 @@ describe("origin check", () => {
     // A browser always sends Origin on a cross-site POST, so its absence means
     // a non-browser caller, which carries no ambient cookies and so no CSRF risk.
     const app = await build();
-    const res = await app.inject({ method: "POST", url: "/api/v1/mutating-probe" });
-    expect(res.statusCode).not.toBe(403);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/mutating-probe",
+      cookies: COOKIES,
+    });
+    expect(res.statusCode).toBe(200);
     await app.close();
   });
 
@@ -1449,6 +1609,7 @@ describe("origin check", () => {
     const res = await app.inject({
       method: "POST",
       url: "/api/v1/mutating-probe",
+      cookies: COOKIES,
       headers: { referer: "https://evil.example.com/page" },
     });
     expect(res.statusCode).toBe(403);
@@ -1747,12 +1908,34 @@ Add to `packages/database/src/index.ts`:
 export * from "./setup.js";
 ```
 
-- [ ] **Step 5: Run tests**
+- [ ] **Step 5: Delete the superseded `completeSetup`**
+
+Phase 1's `completeSetup(db)` marked the installation complete without creating
+an owner. `completeSetupWithOwner` is now the only path that may do that, and
+leaving both invites someone to call the one that produces a completed install
+with no owner — exactly the unrecoverable state Step 3 is designed to prevent.
+
+In `packages/database/src/installation.ts`: delete the `completeSetup` function
+and its doc comment. Drop `isNull` from the `drizzle-orm` import and
+`Installation` from the type import if nothing else in the file uses them.
+
+In `packages/database/src/migrate.test.ts`: drop `completeSetup` from the
+`./installation.js` import and delete the first test in the
+`describe("completeSetup", ...)` block — the one asserting a concurrent race
+produces one winner; `setup.test.ts` now covers that behaviour. **Keep** the
+second test in that block ("rejects a second installation row at the database
+level") — it exercises the singleton constraint, not `completeSetup`. Rename the
+block to `describe("installation row", ...)`.
+
+Run `pnpm --filter @harbor/database lint` and confirm no unused-import errors.
+
+- [ ] **Step 6: Run tests**
 
 Run: `pnpm --filter @harbor/database test`
-Expected: PASS — 4 setup tests plus everything prior.
+Expected: PASS — 4 setup tests plus everything prior, minus the one deleted
+`completeSetup` test.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add packages/database
@@ -1761,15 +1944,15 @@ git commit -m "feat(database): atomic owner creation and setup completion"
 
 ---
 
-## Task 11: Setup and auth routes
+## Task 11: Setup route
 
 **Files:**
-- Create: `apps/server/src/modules/setup/routes.ts`, `apps/server/src/modules/auth/routes.ts`, `apps/server/src/modules/auth/routes.test.ts`
+- Create: `apps/server/src/modules/setup/routes.ts`
 - Modify: `apps/server/src/app.ts`
 
 **Interfaces:**
-- Consumes: everything from Tasks 3-10
-- Produces: `setupRoutes`, `authRoutes` Fastify plugins
+- Consumes: Tasks 3, 4, 5, 7, 10
+- Produces: `setupRoutes` Fastify plugin
 
 - [ ] **Step 1: Create `apps/server/src/modules/setup/routes.ts`**
 
@@ -1850,12 +2033,76 @@ export const setupRoutes: FastifyPluginAsync = async (fastify) => {
 };
 ```
 
-- [ ] **Step 2: Create `apps/server/src/modules/auth/routes.ts`**
+- [ ] **Step 2: Register it in `apps/server/src/app.ts`**
+
+Add the import and register inside the existing `{ prefix: API_PREFIX }` scope,
+after `installationRoutes`:
+
+```ts
+import { setupRoutes } from "./modules/setup/routes.js";
+...
+      await api.register(setupRoutes);
+```
+
+- [ ] **Step 3: Verify against a real database**
+
+Start Postgres, build, boot the server (see `docs/development.md` for the exported variables), then:
+
+```bash
+curl -si -X POST localhost:3000/api/v1/setup -H 'content-type: application/json' \
+  -H 'origin: http://localhost:3000' \
+  -d '{"language":"en","serverName":"Test","username":"owner","email":"o@example.com","password":"correct-horse-battery"}'
+```
+
+Confirm: `201`, a `set-cookie` carrying `harbor_session` with `HttpOnly` and `SameSite=Lax`, and a body containing the user without any hash.
+
+Keep the cookie value — Task 12 uses it. Then confirm repeat setup is refused:
+
+```bash
+curl -si -X POST localhost:3000/api/v1/setup -H 'content-type: application/json' \
+  -H 'origin: http://localhost:3000' -d '{"language":"en","serverName":"x","username":"a","email":"a@b.co","password":"correct-horse-battery"}' | head -1
+```
+
+Expected: `409`.
+
+Report the real output. Leave the container running for Task 12.
+
+- [ ] **Step 4: Run tests and commit**
+
+Run: `pnpm --filter @harbor/server test`
+Expected: PASS — everything prior still green.
+
+```bash
+git add apps/server
+git commit -m "feat(setup): owner setup route"
+```
+
+---
+
+## Task 12: Auth routes
+
+**Files:**
+- Create: `apps/server/src/modules/auth/routes.ts`, `apps/server/src/modules/auth/routes.test.ts`
+- Modify: `apps/server/src/app.ts`
+
+**Interfaces:**
+- Consumes: Tasks 2-8
+- Produces: `authRoutes` Fastify plugin serving `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`
+
+- [ ] **Step 1: Create `apps/server/src/modules/auth/routes.ts`**
+
+**Read the ordering comment in the handler before writing it.** The sequence is
+load-bearing: the throttle decision must be made *before* the code branches on
+whether the account exists, or a throttled account answers 429 while an unknown
+identifier answers 401 — an account-enumeration oracle that the per-IP throttle
+does not mask, because IP state is per-process and in-memory while
+`failed_login_count` persists in the database.
 
 ```ts
 import {
   createSession,
   deleteSession,
+  findSessionByTokenHash,
   findUserByIdentifier,
   recordFailedLogin,
   resetFailedLogins,
@@ -1864,9 +2111,15 @@ import type { AuthenticatedUser } from "@harbor/shared";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { HarborError } from "../../plugins/errors.js";
-import { clearSessionCookie, setSessionCookie } from "./cookies.js";
-import { hashPassword, verifyAgainstDummy, verifyPassword } from "./passwords.js";
-import { IpThrottle, retryAfterSeconds } from "./throttle.js";
+import { SESSION_COOKIE, clearSessionCookie, setSessionCookie } from "./cookies.js";
+import { verifyAgainstDummy, verifyPassword } from "./passwords.js";
+import {
+  AttemptThrottle,
+  FREE_ATTEMPTS,
+  IP_FREE_ATTEMPTS,
+  identifierKey,
+  retryAfterSeconds,
+} from "./throttle.js";
 import { generateSessionToken, hashSessionToken, sessionExpiry } from "./tokens.js";
 
 const LoginSchema = z.object({
@@ -1878,7 +2131,19 @@ const LoginSchema = z.object({
 const INVALID_CREDENTIALS = "Invalid credentials.";
 
 export const authRoutes: FastifyPluginAsync = async (fastify) => {
-  const ipThrottle = new IpThrottle();
+  /**
+   * Two dimensions, two budgets. The IP dimension is generous (see throttle.ts)
+   * because a misconfigured HARBOR_TRUST_PROXY collapses every client onto one
+   * address.
+   *
+   * The unknown-identifier store exists solely so the 429 branch is reachable
+   * when no account matches. Without it, a throttled real account answers 429
+   * while an unknown identifier answers 401, and that difference enumerates
+   * accounts. It is deliberately keyed by a SHA-256 of the identifier so the
+   * process never holds a list of attempted usernames.
+   */
+  const ipThrottle = new AttemptThrottle(IP_FREE_ATTEMPTS);
+  const unknownIdentifiers = new AttemptThrottle(FREE_ATTEMPTS);
 
   fastify.post(
     "/auth/login",
@@ -1896,28 +2161,46 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const user = await findUserByIdentifier(fastify.db, parsed.data.identifier);
+      const key = identifierKey(parsed.data.identifier);
 
-      if (!user) {
-        // Constant work so response timing does not reveal account existence.
-        await verifyAgainstDummy();
-        ipThrottle.record(request.ip);
-        throw new HarborError("UNAUTHENTICATED", INVALID_CREDENTIALS, 401);
-      }
+      // Decide the backoff BEFORE branching on whether the account exists.
+      // Existing accounts read the persistent counter; unknown identifiers read
+      // the in-memory store. Both feed the same response below, so a throttled
+      // account and a throttled unknown identifier are indistinguishable.
+      const identifierWait = user
+        ? retryAfterSeconds(user.failedLoginCount, user.lastFailedLoginAt)
+        : unknownIdentifiers.retryAfter(key);
 
-      const accountWait = retryAfterSeconds(user.failedLoginCount, user.lastFailedLoginAt);
-      if (accountWait > 0) {
-        void reply.header("Retry-After", String(accountWait));
+      if (identifierWait > 0) {
+        void reply.header("Retry-After", String(identifierWait));
         throw new HarborError("RATE_LIMITED", "Too many attempts. Try again shortly.", 429);
       }
 
-      if (!(await verifyPassword(user.passwordHash, parsed.data.password))) {
-        await recordFailedLogin(fastify.db, user.id);
+      // Constant work either way, so response timing does not reveal existence.
+      const authenticated = user
+        ? await verifyPassword(user.passwordHash, parsed.data.password)
+        : await verifyAgainstDummy().then(() => false);
+
+      if (!authenticated) {
+        if (user) {
+          await recordFailedLogin(fastify.db, user.id);
+          fastify.log.warn({ userId: user.id }, "failed login");
+        } else {
+          unknownIdentifiers.record(key);
+          // No identifier in the log line — it may be someone's email address.
+          fastify.log.warn("failed login for an unknown identifier");
+        }
         ipThrottle.record(request.ip);
-        fastify.log.warn({ userId: user.id }, "failed login");
         throw new HarborError("UNAUTHENTICATED", INVALID_CREDENTIALS, 401);
       }
 
+      // Unreachable — `authenticated` is only true when a user was found — but
+      // TypeScript cannot narrow `user` from it, and an explicit fail-closed
+      // branch is better than a non-null assertion in an auth path.
+      if (!user) throw new HarborError("UNAUTHENTICATED", INVALID_CREDENTIALS, 401);
+
       await resetFailedLogins(fastify.db, user.id);
+      unknownIdentifiers.reset(key);
       ipThrottle.reset(request.ip);
 
       const token = generateSessionToken();
@@ -1937,8 +2220,23 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
+  /**
+   * Idempotent and allowlisted as public (see PUBLIC_ROUTES in plugins/auth.ts).
+   * If logout were guarded, an expired or already-revoked session would get a
+   * 401 and the browser would keep its stale cookie forever — the one state
+   * where a user most needs logout to work. So: always clear the cookie, delete
+   * the row only if one exists, and always answer 204. It reveals nothing,
+   * because the response is the same whether or not the token matched.
+   *
+   * The session is resolved from the cookie rather than `request.session`,
+   * which the guard leaves null on a public route.
+   */
   fastify.post("/auth/logout", async (request, reply) => {
-    if (request.session) await deleteSession(fastify.db, request.session.id);
+    const token = request.cookies[SESSION_COOKIE];
+    if (token) {
+      const found = await findSessionByTokenHash(fastify.db, hashSessionToken(token));
+      if (found) await deleteSession(fastify.db, found.session.id);
+    }
     clearSessionCookie(reply, fastify.env.HARBOR_BASE_URL);
     void reply.status(204);
     return null;
@@ -1953,21 +2251,22 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
 };
 ```
 
-Note `hashPassword` is imported above only for the setup route's sibling module; if your editor flags it as unused in this file, remove that import rather than leaving a re-export.
+This module does not import `hashPassword` — only `verifyPassword` and
+`verifyAgainstDummy`. Hashing happens in the setup route (Task 11) and, later,
+in user management. Root ESLint treats `no-unused-vars` as an error, so an
+unused import fails `pnpm lint`.
 
-- [ ] **Step 3: Register both in `apps/server/src/app.ts`**
+- [ ] **Step 2: Register it in `apps/server/src/app.ts`**
 
-Add imports and register inside the existing `{ prefix: API_PREFIX }` scope, after `installationRoutes`:
+Add the import and register inside the existing `{ prefix: API_PREFIX }` scope, after `setupRoutes`:
 
 ```ts
 import { authRoutes } from "./modules/auth/routes.js";
-import { setupRoutes } from "./modules/setup/routes.js";
 ...
-      await api.register(setupRoutes);
       await api.register(authRoutes);
 ```
 
-- [ ] **Step 4: Write the route tests**
+- [ ] **Step 3: Write the route tests**
 
 `apps/server/src/modules/auth/routes.test.ts`:
 
@@ -1983,6 +2282,7 @@ vi.mock("@harbor/database", async (importOriginal) => {
     ...actual,
     findUserByIdentifier: vi.fn(),
     createSession: vi.fn(),
+    deleteSession: vi.fn(),
     recordFailedLogin: vi.fn(),
     resetFailedLogins: vi.fn(),
     findSessionByTokenHash: vi.fn(),
@@ -2008,10 +2308,25 @@ const user = () => ({
   updatedAt: new Date(),
 });
 
+const validSession = () => ({
+  session: {
+    id: "44444444-4444-4444-4444-444444444444",
+    userId: user().id,
+    tokenHash: "hash",
+    expiresAt: new Date(Date.now() + 60_000),
+    lastSeenAt: new Date(),
+    userAgent: null,
+    ip: null,
+    createdAt: new Date(),
+  },
+  user: user(),
+});
+
 beforeEach(async () => {
   vi.clearAllMocks();
   storedHash ??= await hashPassword(PASSWORD);
   vi.mocked(db.createSession).mockResolvedValue({} as never);
+  vi.mocked(db.deleteSession).mockResolvedValue(undefined);
   vi.mocked(db.recordFailedLogin).mockResolvedValue(1);
   vi.mocked(db.resetFailedLogins).mockResolvedValue(undefined);
 });
@@ -2059,6 +2374,35 @@ describe("POST /api/v1/auth/login", () => {
     await app.close();
   });
 
+  it("returns the same status for a throttled account and an unknown identifier", async () => {
+    // THIS TEST IS THE POINT OF THE HANDLER'S ORDERING — do not "simplify" it
+    // back to comparing two un-throttled responses. The 401-vs-401 case above
+    // passes no matter how the handler is written, because with
+    // failedLoginCount: 0 no 429 is reachable at all. The enumeration oracle
+    // lives on the throttled path: if the backoff is computed only after the
+    // `if (!user)` branch, a throttled real account answers 429 + Retry-After
+    // while an unknown identifier answers 401, and anyone can tell which
+    // usernames exist by mistyping a password three times.
+    const app = await buildTestApp({ ready: true });
+
+    vi.mocked(db.findUserByIdentifier).mockResolvedValue({
+      ...user(),
+      failedLoginCount: 8,
+      lastFailedLoginAt: new Date(),
+    });
+    const throttled = await login({ identifier: "owner", password: "wrong" }, app);
+
+    // Drive the unknown identifier into the same throttled state.
+    vi.mocked(db.findUserByIdentifier).mockResolvedValue(null);
+    for (let i = 0; i < 8; i++) await login({ identifier: "ghost", password: "wrong" }, app);
+    const unknown = await login({ identifier: "ghost", password: "wrong" }, app);
+
+    expect(throttled.statusCode).toBe(429);
+    expect(unknown.statusCode).toBe(throttled.statusCode);
+    expect(unknown.headers["retry-after"]).toBe(throttled.headers["retry-after"]);
+    await app.close();
+  });
+
   it("records a failed attempt on a wrong password", async () => {
     vi.mocked(db.findUserByIdentifier).mockResolvedValue(user());
     const app = await buildTestApp({ ready: true });
@@ -2092,17 +2436,42 @@ describe("POST /api/v1/auth/login", () => {
 });
 
 describe("POST /api/v1/auth/logout", () => {
-  it("is itself guarded — logging out without a session is rejected", async () => {
-    // Logout is deliberately NOT on the public allowlist, so the guard rejects
-    // before the handler runs. Logging out with no session is meaningless.
+  it("succeeds and clears the cookie even with an expired or unknown session", async () => {
+    // Logout is idempotent and allowlisted. If it were guarded, an expired
+    // session would get 401 and the browser would keep the stale cookie
+    // forever — and the web client, which does not inspect res.ok, would
+    // cheerfully report a successful sign-out.
     vi.mocked(db.findSessionByTokenHash).mockResolvedValue(null);
     const app = await buildTestApp({ ready: true });
+
     const res = await app.inject({
       method: "POST",
       url: "/api/v1/auth/logout",
+      cookies: { harbor_session: "expired-or-revoked" },
       headers: { origin: "http://localhost:3000" },
     });
-    expect(res.statusCode).toBe(401);
+
+    expect(res.statusCode).toBe(204);
+    const cleared = res.cookies.find((c) => c.name === "harbor_session");
+    expect(cleared).toBeDefined();
+    expect(cleared?.value).toBe("");
+    expect(db.deleteSession).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("deletes the session row when the cookie matches one", async () => {
+    vi.mocked(db.findSessionByTokenHash).mockResolvedValue(validSession());
+    const app = await buildTestApp({ ready: true });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/logout",
+      cookies: { harbor_session: "token" },
+      headers: { origin: "http://localhost:3000" },
+    });
+
+    expect(res.statusCode).toBe(204);
+    expect(db.deleteSession).toHaveBeenCalledOnce();
     await app.close();
   });
 });
@@ -2118,45 +2487,40 @@ describe("GET /api/v1/auth/me", () => {
 });
 ```
 
-- [ ] **Step 5: Run tests**
+- [ ] **Step 4: Run tests**
 
 Run: `pnpm --filter @harbor/server test`
 Expected: PASS — all new route tests plus everything prior.
 
-- [ ] **Step 6: Verify against a real database**
+- [ ] **Step 5: Verify against a real database**
 
-Start Postgres, build, boot the server (see `docs/development.md` for the exported variables), then:
+Using the server and the owner cookie from Task 11 Step 3:
 
 ```bash
-curl -si -X POST localhost:3000/api/v1/setup -H 'content-type: application/json' \
+curl -s localhost:3000/api/v1/auth/me -b "harbor_session=<token from Task 11>"
+curl -si -X POST localhost:3000/api/v1/auth/login -H 'content-type: application/json' \
   -H 'origin: http://localhost:3000' \
-  -d '{"language":"en","serverName":"Test","username":"owner","email":"o@example.com","password":"correct-horse-battery"}'
+  -d '{"identifier":"owner","password":"correct-horse-battery"}' | head -1
+curl -si -X POST localhost:3000/api/v1/auth/logout -H 'origin: http://localhost:3000' \
+  -b "harbor_session=definitely-not-a-real-token" | head -1
 ```
 
-Confirm: `201`, a `set-cookie` carrying `harbor_session` with `HttpOnly` and `SameSite=Lax`, and a body containing the user without any hash.
-
-Then confirm the session works and repeat-setup is refused:
-
-```bash
-curl -s localhost:3000/api/v1/auth/me -b "harbor_session=<token from the cookie>"
-curl -si -X POST localhost:3000/api/v1/setup -H 'content-type: application/json' \
-  -H 'origin: http://localhost:3000' -d '{"language":"en","serverName":"x","username":"a","email":"a@b.co","password":"correct-horse-battery"}' | head -1
-```
-
-Expected: the first returns the owner; the second returns `409`.
+Expected: `auth/me` returns the owner; login returns `200` with a fresh
+`set-cookie`; logout with a bogus cookie returns `204` and still sends a
+clearing `set-cookie`.
 
 Report the real output. Clean up the container afterwards.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add apps/server
-git commit -m "feat(auth): setup, login, logout and me routes"
+git commit -m "feat(auth): login, logout and me routes"
 ```
 
 ---
 
-## Task 12: Web — setup wizard and login
+## Task 13: Web — setup wizard and login
 
 **Files:**
 - Create: `apps/web/src/auth.ts`, `apps/web/src/pages/Login.tsx`
@@ -2477,9 +2841,12 @@ export const router = createBrowserRouter([
 ]);
 ```
 
-- [ ] **Step 5: Import the shared types in `apps/web/src/api.ts`**
+- [ ] **Step 5: Confirm `apps/web/src/api.ts` already re-exports the shared type**
 
-Replace its locally-declared `InstallationState` with a re-export so server and client cannot drift:
+**No change needed — this is a verification step.** Phase 1 already landed this;
+the file must read exactly as below, importing `InstallationState` from
+`@harbor/shared` rather than declaring its own, so server and client cannot
+drift. Confirm it does and move on; do not rewrite the file.
 
 ```ts
 import type { InstallationState } from "@harbor/shared";
@@ -2512,11 +2879,11 @@ git commit -m "feat(web): setup wizard and login screens"
 
 ---
 
-## Task 13: Playwright end-to-end tests
+## Task 14: Playwright end-to-end tests
 
 **Files:**
-- Create: `e2e/package.json`, `e2e/playwright.config.ts`, `e2e/tests/setup-and-login.spec.ts`, `e2e/.gitignore`
-- Modify: `pnpm-workspace.yaml`, root `package.json`
+- Create: `e2e/package.json`, `e2e/tsconfig.json`, `e2e/playwright.config.ts`, `e2e/tests/setup-and-login.spec.ts`, `e2e/.gitignore`
+- Modify: `pnpm-workspace.yaml`, root `package.json`, `turbo.json`
 
 **Interfaces:**
 - Consumes: the running application
@@ -2554,14 +2921,45 @@ packages:
 }
 ```
 
-- [ ] **Step 3: Create `e2e/.gitignore`**
+- [ ] **Step 3: Create `e2e/tsconfig.json`**
+
+Required, not optional. There is no root `tsconfig.json` — only
+`tsconfig.base.json` — so without this file `tsc --noEmit` exits 1 with
+`TS18003 "No inputs were found"`. Root `pnpm typecheck` runs across every
+workspace package, so a missing config here fails the whole repo's typecheck,
+which Task 15 Step 4 asserts is clean.
+
+`moduleResolution: bundler` matches how Playwright loads the specs (extensionless
+relative imports), unlike the `nodenext` packages.
+
+```json
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "moduleResolution": "bundler",
+    "module": "esnext",
+    "noEmit": true,
+    "composite": false,
+    "types": ["node"]
+  },
+  "include": ["tests", "playwright.config.ts"]
+}
+```
+
+- [ ] **Step 4: Create `e2e/.gitignore`**
+
+`.e2e-data/` is created by the `HARBOR_DATA_DIRECTORY` the config sets, and the
+suite runs before `git add e2e` — without this entry the data directory gets
+committed.
 
 ```
+.e2e-data/
+node_modules/
 playwright-report/
 test-results/
 ```
 
-- [ ] **Step 4: Create `e2e/playwright.config.ts`**
+- [ ] **Step 5: Create `e2e/playwright.config.ts`**
 
 `gracefulShutdown` is set because Harbor handles SIGTERM deliberately; letting Playwright hard-kill the process would leave containers behind.
 
@@ -2581,7 +2979,12 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
     command: "node ../apps/server/dist/server.js",
-    url: `${BASE_URL}/api/v1/health`,
+    // /health/ready, not /health: boot.ts binds the listener BEFORE migrations
+    // run, so /health answers 200 while the schema is still being created.
+    // Waiting on it starts the tests mid-migration, /installation/state 503s,
+    // and the app renders its error state. This matches the Dockerfile
+    // HEALTHCHECK.
+    url: `${BASE_URL}/api/v1/health/ready`,
     timeout: 120_000,
     reuseExistingServer: false,
     gracefulShutdown: { signal: "SIGTERM", timeout: 10_000 },
@@ -2599,7 +3002,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 5: Create `e2e/tests/setup-and-login.spec.ts`**
+- [ ] **Step 6: Create `e2e/tests/setup-and-login.spec.ts`**
 
 `fullyParallel` is false and the tests run in order because they share one install: the first completes setup, and the rest depend on that state.
 
@@ -2674,7 +3077,7 @@ test("correct credentials sign the owner in and the session survives reload", as
 });
 ```
 
-- [ ] **Step 6: Add a root script**
+- [ ] **Step 7: Add a root script**
 
 Add to the root `package.json` `scripts`:
 
@@ -2682,7 +3085,21 @@ Add to the root `package.json` `scripts`:
     "test:e2e": "turbo run test:e2e",
 ```
 
-- [ ] **Step 7: Run it**
+- [ ] **Step 8: Declare the task in `turbo.json`**
+
+Required alongside the root script. Turbo 2 fails with "Could not find task
+`test:e2e` in project" if the script exists but the task does not. Add to
+`tasks`, alongside the existing `test` entry:
+
+```json
+    "test:e2e": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "env": ["E2E_DATABASE_URL", "CI"]
+    },
+```
+
+- [ ] **Step 9: Run it**
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d
@@ -2701,16 +3118,16 @@ docker compose -f docker-compose.dev.yml down -v && docker compose -f docker-com
 
 Report the real output, then clean up.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
-git add e2e pnpm-workspace.yaml package.json pnpm-lock.yaml
+git add e2e pnpm-workspace.yaml package.json turbo.json pnpm-lock.yaml
 git commit -m "test(e2e): Playwright coverage for setup and login"
 ```
 
 ---
 
-## Task 14: CI and documentation
+## Task 15: CI and documentation
 
 **Files:**
 - Modify: `.github/workflows/build-and-verify.yml`, `docs/development.md`, `README.md`
@@ -2809,13 +3226,34 @@ setup, and authenticates users with server-side sessions. Roles are stored but
 not yet enforced; invitations, user management, and profiles arrive in 2b and 2c.
 ```
 
-- [ ] **Step 4: Verify everything**
+- [ ] **Step 4: Verify everything, including the container**
 
 ```bash
 pnpm lint && pnpm typecheck && pnpm test && pnpm build
 ```
 
 Expected: all clean.
+
+Then build and smoke the image. This is not optional this phase:
+`@node-rs/argon2` is Harbor's **first dependency with platform-specific native
+binaries**, and the Dockerfile installs production dependencies with
+`pnpm deploy --prod --legacy`. Whether the correct `linux-*-gnu`/`musl` binary
+lands in the runtime stage is not observable from `pnpm build` on the host — a
+missing or wrong-libc binary shows up only as a boot-time
+`Cannot find module '@node-rs/argon2-linux-...'`.
+
+```bash
+pnpm docker:build
+pnpm docker:smoke
+```
+
+Expected: the build completes for the runtime stage, and the smoke test reports
+the container healthy with `/api/v1/health` and `/api/v1/health/ready`
+responding. Paste both outputs into your report.
+
+If the image fails to resolve the native module, add the matching optional
+dependency for the image's platform rather than switching to a pure-JS Argon2
+implementation — password hashing performance is a security parameter here.
 
 - [ ] **Step 5: Commit**
 
@@ -2831,12 +3269,12 @@ git commit -m "ci: run end-to-end tests, document the suite"
 1. A fresh install serves `/setup`; completing the wizard creates the owner and lands them logged in.
 2. Setup is atomic: concurrent attempts produce exactly one owner, and a failed attempt leaves the install retryable.
 3. Repeat setup attempts return `409 SETUP_ALREADY_COMPLETE`.
-4. Login and logout work; a session survives a page reload and a server restart. Restart survival is structural — sessions live in PostgreSQL, not process memory — and needs no separate mechanism.
-5. Every route not on the public allowlist returns 401 without a valid session, including routes registered with no explicit guard.
+4. Login and logout work; logout is idempotent and clears the cookie even when the session has already expired or been revoked; a session survives a page reload and a server restart. Restart survival is structural — sessions live in PostgreSQL, not process memory — and needs no separate mechanism.
+5. Every route not on the public allowlist returns 401 without a valid session, including routes registered with no explicit guard. While Harbor is not ready, those routes still return `503 SERVICE_UNAVAILABLE` rather than a 500 from the guard's database lookup — Phase 1's contract is preserved.
 6. `deleteSessionsForUser` exists and is tested (Task 2). No password-change endpoint ships in 2a — it arrives with user management in 2c — so the end-to-end invalidation flow is deliberately out of scope here.
 7. Repeated failed logins return 429 with `Retry-After` and never permanently lock an account.
-8. Unknown-user and wrong-password responses are indistinguishable apart from the request ID.
+8. Unknown-user and wrong-password responses are indistinguishable apart from the request ID — **including on the throttled path**, where a backed-off account and a backed-off unknown identifier return the same status and the same `Retry-After`. The backoff is computed before the handler branches on whether the account exists, and failed attempts against unknown identifiers are tracked too.
 9. Session cookies carry `HttpOnly` and `SameSite=Lax`, with `Secure` matching the base-URL protocol.
 10. Cross-origin mutating requests are rejected.
 11. Playwright covers first-time setup and owner login.
-12. Lint, typecheck, unit, integration, and end-to-end tests pass.
+12. Lint, typecheck, unit, integration, and end-to-end tests pass, and `pnpm docker:build` + `pnpm docker:smoke` succeed — proving the new native `@node-rs/argon2` binary survives the image's `pnpm deploy --prod --legacy` step.
