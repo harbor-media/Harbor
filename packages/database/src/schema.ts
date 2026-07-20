@@ -15,6 +15,12 @@ import {
 
 export const userRole = pgEnum("user_role", ["owner", "administrator", "user", "guest"]);
 
+export const registrationMode = pgEnum("registration_mode", [
+  "disabled",
+  "invitation-only",
+  "open",
+]);
+
 export const installation = pgTable(
   "installation",
   {
@@ -22,6 +28,7 @@ export const installation = pgTable(
     setupCompletedAt: timestamp("setup_completed_at", { withTimezone: true, mode: "date" }),
     serverName: text("server_name"),
     language: text("language"),
+    registrationMode: registrationMode("registration_mode").notNull().default("invitation-only"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
       .notNull()
       .defaultNow(),
@@ -99,7 +106,41 @@ export const sessions = pgTable(
   ],
 );
 
+export const invitations = pgTable(
+  "invitations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tokenHash: text("token_hash").notNull().unique(),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: userRole("role").notNull(),
+    email: text("email"),
+    maxUses: integer("max_uses").notNull().default(1),
+    useCount: integer("use_count").notNull().default(0),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true, mode: "date" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    // The database refuses use_count > max_uses structurally, so a logic bug
+    // cannot over-redeem an invite even if the transaction guard were wrong.
+    check("invitations_max_uses_positive", sql`${t.maxUses} >= 1`),
+    check(
+      "invitations_use_count_bounded",
+      sql`${t.useCount} >= 0 and ${t.useCount} <= ${t.maxUses}`,
+    ),
+    // created_by is a foreign key; Postgres does not auto-index the referencing
+    // side, and both "list an admin's invites" and the ON DELETE cascade need it.
+    index("invitations_created_by_idx").on(t.createdBy),
+  ],
+);
+
 export type Installation = typeof installation.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Session = typeof sessions.$inferSelect;
+export type Invitation = typeof invitations.$inferSelect;
+export type NewInvitation = typeof invitations.$inferInsert;
