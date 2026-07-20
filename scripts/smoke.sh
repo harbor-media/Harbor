@@ -2,6 +2,7 @@
 set -euo pipefail
 
 IMAGE="${1:-harbor:dev}"
+PORT="${2:-3000}"
 NETWORK="harbor-smoke-$$"
 PG="harbor-smoke-pg-$$"
 APP="harbor-smoke-app-$$"
@@ -24,16 +25,17 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 
-docker run -d --name "$APP" --network "$NETWORK" -p 3000:3000 \
+docker run -d --name "$APP" --network "$NETWORK" -p "$PORT:$PORT" \
   -e DATABASE_URL="postgresql://harbor:smoke@$PG:5432/harbor" \
-  -e HARBOR_BASE_URL=http://localhost:3000 \
+  -e HARBOR_BASE_URL="http://localhost:$PORT" \
   -e HARBOR_SECRET=0123456789abcdef0123456789abcdef \
+  -e HARBOR_PORT="$PORT" \
   "$IMAGE" >/dev/null
 
 echo "waiting for readiness..."
 ready=false
 for _ in $(seq 1 60); do
-  if curl -fsS http://localhost:3000/api/v1/health/ready >/dev/null 2>&1; then ready=true; break; fi
+  if curl -fsS "http://localhost:$PORT/api/v1/health/ready" >/dev/null 2>&1; then ready=true; break; fi
   sleep 1
 done
 
@@ -44,12 +46,12 @@ if [ "$ready" != "true" ]; then
 fi
 
 echo "checking endpoints..."
-curl -fsS http://localhost:3000/api/v1/health/live  | grep -q '"status":"ok"'
-curl -fsS http://localhost:3000/api/v1/health       | grep -q '"version"'
-curl -fsS http://localhost:3000/api/v1/installation/state | grep -q '"setupComplete":false'
+curl -fsS "http://localhost:$PORT/api/v1/health/live"  | grep -q '"status":"ok"'
+curl -fsS "http://localhost:$PORT/api/v1/health"       | grep -q '"version"'
+curl -fsS "http://localhost:$PORT/api/v1/installation/state" | grep -q '"setupComplete":false'
 
 echo "checking API 404 shape..."
-curl -sS http://localhost:3000/api/v1/nope | grep -q '"code":"NOT_FOUND"'
+curl -sS "http://localhost:$PORT/api/v1/nope" | grep -q '"code":"NOT_FOUND"'
 
 echo "checking no secrets in logs..."
 if docker logs "$APP" 2>&1 | grep -q "0123456789abcdef0123456789abcdef"; then
