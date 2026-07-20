@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD CONSTRAINT "users_username_no_at" CHECK (position('@' in "users"."username") = 0);

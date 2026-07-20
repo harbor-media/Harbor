@@ -78,6 +78,44 @@ describe("users", () => {
     ).rejects.toThrow();
   });
 
+  it("rejects a username containing '@' at the application level", async () => {
+    await expect(
+      createUser(db, { ...base, username: "has@sign" }),
+    ).rejects.toThrow("username must not contain '@'");
+  });
+
+  it("rejects a username containing '@' at the database level (CHECK constraint)", async () => {
+    let caught: unknown;
+    try {
+      await db.execute(
+        sql`insert into users (username, email, password_hash, role)
+            values ('raw@insert', 'raw-insert@example.com', 'hash', 'user')`,
+      );
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeDefined();
+    const pgError = (caught as { cause?: unknown }).cause ?? caught;
+    // eslint-disable-next-line no-console
+    console.log("Postgres CHECK-violation error:", pgError);
+    expect((pgError as { code?: string }).code).toBe("23514");
+    expect((pgError as { constraint_name?: string }).constraint_name).toBe("users_username_no_at");
+  });
+
+  it("normalizes username and email on write and finds them with differently cased input", async () => {
+    const created = await createUser(db, {
+      ...base,
+      username: "  OwnerTwo  ",
+      email: "  Owner.Two@Example.COM  ",
+    });
+
+    expect(created.username).toBe("ownertwo");
+    expect(created.email).toBe("owner.two@example.com");
+
+    const found = await findUserByIdentifier(db, "OWNER.TWO@example.COM");
+    expect(found?.id).toBe(created.id);
+  });
+
   it("tracks and resets failed logins", async () => {
     const u = await createUser(db, base);
     expect(await recordFailedLogin(db, u.id)).toBe(1);

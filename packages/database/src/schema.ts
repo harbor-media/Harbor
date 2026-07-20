@@ -59,6 +59,13 @@ export const users = pgTable(
     // and document intent.
     uniqueIndex("users_username_lower_idx").on(sql`lower(${t.username})`),
     uniqueIndex("users_email_lower_idx").on(sql`lower(${t.email})`),
+    // Usernames and emails are uniquely constrained independently, so nothing
+    // otherwise stops one user's username from equaling another user's email
+    // (e.g. username "victim@example.com"), which would make identifier
+    // lookup ambiguous. Forbidding "@" in usernames makes the two namespaces
+    // structurally disjoint. Enforced in application code too (see
+    // createUser in users.ts); this CHECK is the database-level backstop.
+    check("users_username_no_at", sql`position('@' in ${t.username}) = 0`),
   ],
 );
 
