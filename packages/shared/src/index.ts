@@ -6,6 +6,9 @@ export const ERROR_CODES = [
   "SETUP_ALREADY_COMPLETE",
   "RATE_LIMITED",
   "UNAUTHENTICATED",
+  "FORBIDDEN",
+  "INVITATION_INVALID",
+  "REGISTRATION_DISABLED",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -125,4 +128,71 @@ export interface SetupResponse {
 /** Response from password validation. */
 export interface ValidatePasswordResponse {
   valid: boolean;
+}
+
+/**
+ * The single source of truth for role precedence. Both requireRole (is the
+ * caller's rank >= the required rank?) and the invite-granting rule (is the
+ * requested role strictly below the creator's?) derive from this, so they
+ * cannot drift.
+ */
+export function roleRank(role: UserRole): number {
+  switch (role) {
+    case "owner":
+      return 3;
+    case "administrator":
+      return 2;
+    case "user":
+      return 1;
+    case "guest":
+      return 0;
+  }
+}
+
+export type RegistrationMode = "disabled" | "invitation-only" | "open";
+
+export type InvitationStatus = "active" | "spent" | "expired" | "revoked";
+
+/** List-item shape returned by GET /invitations. Never carries a token. */
+export interface Invitation {
+  id: string;
+  role: UserRole;
+  emailBound: boolean;
+  status: InvitationStatus;
+  uses: number;
+  maxUses: number;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+export interface CreateInvitationRequest {
+  role: Exclude<UserRole, "owner">;
+  email?: string;
+  maxUses?: number;
+  expiresInDays?: number;
+}
+
+export interface CreateInvitationResponse {
+  invitation: Invitation;
+  token: string;
+  inviteUrl: string;
+}
+
+/** Public inspect response. A negative response is identical for invalid,
+ *  spent, expired, revoked and never-existed tokens, so it cannot enumerate. */
+export interface InviteInspection {
+  valid: boolean;
+  role: UserRole | null;
+  emailBound: boolean;
+}
+
+export interface RegisterRequest {
+  token?: string;
+  username: string;
+  email: string;
+  password: string;
+}
+
+export interface RegisterResponse {
+  user: AuthenticatedUser;
 }
