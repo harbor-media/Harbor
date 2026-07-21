@@ -6,6 +6,7 @@ export * from "./migrate.js";
 export * from "./redeem.js";
 export * from "./registration.js";
 export * from "./schema.js";
+export * from "./search-cache.js";
 export * from "./sessions.js";
 export * from "./setup.js";
 export * from "./titles.js";
