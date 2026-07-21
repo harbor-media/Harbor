@@ -1,9 +1,12 @@
+import { roleRank } from "@harbor/shared";
 import type { JSX } from "react";
+import { Link } from "react-router";
 import { useCurrentUser, useLogout } from "../auth";
 
 export function Home(): JSX.Element {
   const { data: user } = useCurrentUser();
   const logout = useLogout();
+  const isAdmin = user !== null && user !== undefined && roleRank(user.role) >= roleRank("administrator");
 
   return (
     <main className="flex min-h-screen items-center justify-center p-8">
@@ -13,9 +16,30 @@ export function Home(): JSX.Element {
           Signed in as <span className="font-medium">{user?.username ?? "…"}</span>
           {user ? ` (${user.role})` : null}.
         </p>
-        <p className="mt-2 text-sm opacity-60">
-          The catalog arrives in Phase 3. For now this confirms authentication works.
-        </p>
+        <nav className="mt-6" aria-label="Main">
+          <Link
+            className="block rounded bg-harbor-800 p-2 text-center font-medium focus:outline-none focus:ring-2 focus:ring-accent-500"
+            to="/search"
+          >
+            Search
+          </Link>
+          {isAdmin ? (
+            <>
+              <Link
+                className="mt-2 block rounded bg-harbor-800 p-2 text-center font-medium focus:outline-none focus:ring-2 focus:ring-accent-500"
+                to="/admin/metadata"
+              >
+                Metadata settings
+              </Link>
+              <Link
+                className="mt-2 block rounded bg-harbor-800 p-2 text-center font-medium focus:outline-none focus:ring-2 focus:ring-accent-500"
+                to="/admin/invitations"
+              >
+                Invitations
+              </Link>
+            </>
+          ) : null}
+        </nav>
 
         <button
           type="button"

@@ -9,6 +9,7 @@ import { Invite } from "./pages/Invite";
 import { Invitations } from "./pages/Invitations";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
+import { Search } from "./pages/Search";
 import { Setup } from "./pages/Setup";
 
 function RootLayout(): JSX.Element {
@@ -72,6 +73,7 @@ export const router = createBrowserRouter([
       { path: "invite/:token", Component: Invite },
       { path: "register", Component: Register },
       { path: "home", Component: Home },
+      { path: "search", Component: Search },
       { path: "admin/invitations", Component: Invitations },
       { path: "admin/metadata", Component: AdminMetadata },
     ],
