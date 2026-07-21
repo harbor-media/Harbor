@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import type { Db } from "./client.js";
 import { titleExternalIds, titles } from "./schema.js";
 
@@ -38,6 +38,21 @@ export async function upsertTitles(db: Db, items: NormalizedTitle[]): Promise<st
     if (!primary) throw new Error("a normalized title must carry at least one external id");
 
     const id = await db.transaction(async (tx) => {
+      // Two concurrent upserts of the same (source, external_id) can both run
+      // the SELECT below before either INSERT commits -- READ COMMITTED does
+      // not protect against that -- and both would then insert a `titles`
+      // row, with only one surviving the title_external_ids unique index
+      // (the other silently swallowed by onConflictDoNothing). That leaves an
+      // orphaned title row with no external-id link. A transaction-scoped
+      // advisory lock serializes upserts of the same natural key while
+      // leaving different titles fully parallel; PostgreSQL releases it
+      // automatically at commit or rollback, so it cannot leak. Same idiom as
+      // the migration lock in migrate.ts, scoped to the transaction instead
+      // of the session since this connection is pooled.
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${primary.source} || ':' || ${primary.externalId}))`,
+      );
+
       // The natural key is (source, external_id) -- matching by external_id
       // alone would conflate ids from different providers.
       const existing = await tx

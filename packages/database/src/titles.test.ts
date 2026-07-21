@@ -16,7 +16,10 @@ let db: Db;
 beforeAll(async () => {
   container = await new PostgreSqlContainer("postgres:17-alpine").start();
   await runMigrations(container.getConnectionUri(), migrationsFolder);
-  const c = createClient(container.getConnectionUri(), { max: 5 });
+  // A generous pool so the concurrency test below can genuinely run many
+  // upsertTitles calls in parallel across separate connections, rather than
+  // queueing behind a small pool and masking the race.
+  const c = createClient(container.getConnectionUri(), { max: 40 });
   client = c.sql;
   db = c.db;
 }, 120_000);
@@ -77,6 +80,67 @@ describe("upsertTitles", () => {
       title({ externalId: "1002", title: "The Thing", year: 2011 }),
     ]);
     expect(new Set(ids).size).toBe(2);
+  });
+
+  // A TMDB id and an IMDB id can be the same numeric string. The natural key
+  // is (source, external_id), not external_id alone -- if the lookup ever
+  // drops the source filter, these would collapse into a single row.
+  it("keeps titles with the same external id under different sources separate", async () => {
+    const ids = await upsertTitles(db, [
+      title({
+        externalId: "550",
+        title: "Fight Club",
+        externalIds: [{ source: "tmdb", externalId: "550" }],
+      }),
+      title({
+        externalId: "550",
+        title: "Fight Club (IMDB)",
+        externalIds: [{ source: "imdb", externalId: "550" }],
+      }),
+    ]);
+
+    expect(new Set(ids).size).toBe(2);
+  });
+
+  // Under READ COMMITTED, two concurrent upserts of the same (source,
+  // external_id) can both see "not found" on the SELECT before either INSERT
+  // commits, so both would insert a titles row. Only one survives the
+  // title_external_ids unique index; the loser is an orphaned title row with
+  // no external-id link. This must not happen.
+  it("does not create an orphaned title row when two upserts race on the same natural key", async () => {
+    // Whether the check-then-act race actually lands within a single burst of
+    // concurrent calls depends on scheduling and connection setup timing, so
+    // run several independent bursts (each on its own external id, each sized
+    // well under the pool's connection limit) rather than betting everything
+    // on one burst being unlucky enough to interleave.
+    const trialCount = 10;
+    const burstSize = 30;
+
+    const trials = Array.from({ length: trialCount }, (_, trialIndex) => {
+      const externalId = `race-${trialIndex}`;
+      const item = title({ externalId, title: "Race Condition" });
+      return { externalId, item };
+    });
+
+    for (const { item } of trials) {
+      const results = await Promise.all(
+        Array.from({ length: burstSize }, () => upsertTitles(db, [item])),
+      );
+      const ids = new Set(results.map(([id]) => id));
+      // Every upsert in this burst targets the same natural key, so a
+      // correct implementation must resolve them all to a single title id.
+      expect(ids.size).toBe(1);
+    }
+
+    for (const { externalId } of trials) {
+      const externalRows = await db.execute(
+        sql`select title_id from title_external_ids where source = 'tmdb' and external_id = ${externalId}`,
+      );
+      expect(externalRows).toHaveLength(1);
+    }
+
+    const titleRows = await db.execute(sql`select id from titles`);
+    expect(titleRows).toHaveLength(trialCount);
   });
 });
 
