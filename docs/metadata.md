@@ -52,6 +52,12 @@ silently reporting "not configured", so the cause is visible in the logs.
 
 Take a backup before rotating `HARBOR_SECRET`.
 
+## Images
+
+Poster and backdrop artwork is served through Harbor's own image proxy rather
+than fetched from the provider by the browser. See [images.md](images.md) for
+the URL shape, the cache, and `HARBOR_CACHE_MAX_SIZE`.
+
 ## Search behavior
 
 Search is remote-first with cache-on-read:
