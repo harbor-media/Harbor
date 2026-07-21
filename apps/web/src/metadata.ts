@@ -97,6 +97,8 @@ export function describeMetadataError(error: unknown): string {
       return "TMDB could not be reached — this is not a problem with your key. Try again shortly.";
     case "METADATA_NOT_CONFIGURED":
       return "No metadata provider is configured yet.";
+    case "METADATA_KEY_UNREADABLE":
+      return "The stored key could not be decrypted, which happens when HARBOR_SECRET changes. Enter the TMDB key again to restore search.";
     default:
       return error.message;
   }

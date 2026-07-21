@@ -1,4 +1,4 @@
-import { encryptSecret } from "@harbor/crypto";
+import { encryptSecret, SecretDecryptionError } from "@harbor/crypto";
 import { getMetadataProviderConfig, saveMetadataProviderConfig } from "@harbor/database";
 import type { MetadataConfigStatus, SearchResponse } from "@harbor/shared";
 import type { FastifyPluginAsync } from "fastify";
@@ -40,6 +40,18 @@ function toHarborError(error: unknown): HarborError {
     return new HarborError(
       "METADATA_NOT_CONFIGURED",
       "No metadata provider is configured. An administrator can set one up in Settings.",
+      409,
+    );
+  }
+  // A stored key that will not decrypt means HARBOR_SECRET changed. Left
+  // unmapped this returns a generic 500, which tells an operator nothing and
+  // sends them hunting a server fault -- while the config endpoint still
+  // reports the provider as configured. The corrective action is specific and
+  // only they can take it, so it must reach them rather than only the log.
+  if (error instanceof SecretDecryptionError) {
+    return new HarborError(
+      "METADATA_KEY_UNREADABLE",
+      "The stored metadata API key could not be decrypted. This happens when HARBOR_SECRET changes. Re-enter the provider key in metadata settings.",
       409,
     );
   }

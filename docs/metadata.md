@@ -76,6 +76,7 @@ Runner` and `  blade runner  ` share one cache entry.
 | TMDB unreachable, nothing cached | The search fails with `METADATA_PROVIDER_UNAVAILABLE`, marked retryable. |
 | TMDB rejects the key | The search fails with `METADATA_PROVIDER_UNAUTHORIZED`. An administrator must update the key. Stale results are **not** served here — that would hide a broken credential. |
 | No provider configured | `METADATA_NOT_CONFIGURED`, pointing at `/admin/metadata`. This is not an error state; a new installation simply has not been set up yet. |
+| Stored key will not decrypt | `METADATA_KEY_UNREADABLE`, naming `HARBOR_SECRET` as the cause. Distinct from "not configured" on purpose: the credential is still there, it just cannot be read, and the fix is to re-enter it. |
 
 A metadata outage never affects Harbor's readiness check. The server does not
 report itself unhealthy because a third party is down, since that would make

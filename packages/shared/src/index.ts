@@ -12,6 +12,7 @@ export const ERROR_CODES = [
   "METADATA_NOT_CONFIGURED",
   "METADATA_PROVIDER_UNAVAILABLE",
   "METADATA_PROVIDER_UNAUTHORIZED",
+  "METADATA_KEY_UNREADABLE",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
