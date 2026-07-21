@@ -1,4 +1,5 @@
 import { createReadStream } from "node:fs";
+import { Readable } from "node:stream";
 import path from "node:path";
 import type { FastifyPluginAsync } from "fastify";
 import { HarborError } from "../../plugins/errors.js";
@@ -75,7 +76,12 @@ export const imageRoutes: FastifyPluginAsync = async (fastify) => {
       void reply.type(served.contentType);
 
       if (served.kind === "stream") {
-        return reply.send(served.body);
+        // Readable.from is required, not decorative: `served.body` is an async
+        // generator, and Fastify only recognizes objects with .pipe as
+        // streams. Sending the generator directly makes Fastify try to
+        // serialize it, which fails with a 500 -- so the entire degraded
+        // "disk is full, keep serving artwork" path silently did not work.
+        return reply.send(Readable.from(served.body));
       }
 
       // Weak validator from size and mtime. Hashing the bytes would mean
