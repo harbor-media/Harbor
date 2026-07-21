@@ -58,6 +58,11 @@ export async function searchTitles(deps: SearchDeps, rawQuery: string): Promise<
     // page. Expiry is a freshness preference; an outage is not a reason to
     // withhold data Harbor already has.
     if (error instanceof MetadataProviderError && error.kind === "unavailable") {
+      // Passing new Date(0) as "now" is a deliberate sentinel: every cache
+      // entry's expiry is a real timestamp far in the entry's future relative
+      // to the epoch, so this makes readSearchCache treat every entry as
+      // fresh regardless of its actual age, bypassing normal TTL enforcement
+      // to serve whatever stale rows exist.
       const stale = await readSearchCache(deps.db, queryHash, language, new Date(0));
       if (stale) {
         return { results: (await getTitlesByIds(deps.db, stale)).map(toResultItem), cached: true };

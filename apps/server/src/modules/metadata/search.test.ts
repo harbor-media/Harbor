@@ -166,6 +166,39 @@ describe("searchTitles", () => {
     expect(response.cached).toBe(true);
   });
 
+  it("rethrows an unauthorized provider error instead of serving stale cached results", async () => {
+    await configure(db);
+    const calls = { count: 0 };
+
+    await searchTitles(
+      { db, harborSecret: HARBOR_SECRET, providerFactory: () => fakeProvider([BLADE_RUNNER], calls) },
+      "unauthorized test",
+    );
+
+    const unauthorized: MetadataProvider = {
+      id: "tmdb",
+      validateConfiguration: async () => undefined,
+      search: async () => {
+        throw new MetadataProviderError("unauthorized", "bad key");
+      },
+    };
+
+    // Force a cache miss by expiring the entry. Even though stale rows exist,
+    // an unauthorized error must propagate rather than being masked by the
+    // stale-cache fallback, because that fallback is reserved for outages.
+    await expect(
+      searchTitles(
+        {
+          db,
+          harborSecret: HARBOR_SECRET,
+          providerFactory: () => unauthorized,
+          now: () => new Date(Date.now() + 2 * 60 * 60 * 1000),
+        },
+        "unauthorized test",
+      ),
+    ).rejects.toBeInstanceOf(MetadataProviderError);
+  });
+
   it("rethrows when the provider is unavailable and nothing is cached", async () => {
     await configure(db);
     const failing: MetadataProvider = {
