@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createLogger, forRequest, redactSecretsFromText } from "./index.js";
+import { createLogger, forRequest, redactSecretsFromText, redactUrl } from "./index.js";
 
 function capture(): { lines: string[]; stream: { write(s: string): void } } {
   const lines: string[] = [];
@@ -89,6 +89,58 @@ describe("createLogger redaction", () => {
     const entry = JSON.parse(lines[0]!) as Record<string, unknown>;
     expect(entry["requestId"]).toBe("req-1");
     expect(entry["service"]).toBe("harbor");
+  });
+});
+
+describe("redactUrl", () => {
+  // The raw invite token is a bearer credential that can create an account,
+  // potentially an administrator one. It rides in the URL path of the public
+  // inspect route, so it must never reach an access log verbatim.
+  it("masks the token segment of the invite-inspection route", () => {
+    const token = "Xh2n4Kq8vTdR7bLpZ0aJmWcF3sYuE1gN6oQiP5rtBkA";
+    const output = redactUrl(`/api/v1/invitations/${token}`);
+
+    expect(output).not.toContain(token);
+    expect(output).toBe("/api/v1/invitations/[redacted]");
+  });
+
+  it("masks the token but keeps a trailing query string readable", () => {
+    const output = redactUrl("/api/v1/invitations/secret-token-value?trace=1");
+
+    expect(output).not.toContain("secret-token-value");
+    expect(output).toBe("/api/v1/invitations/[redacted]?trace=1");
+  });
+
+  // The admin list route has no trailing segment and carries no secret;
+  // mangling it would make access logs harder to read for no security gain.
+  it("leaves the admin list route unchanged", () => {
+    expect(redactUrl("/api/v1/invitations")).toBe("/api/v1/invitations");
+    expect(redactUrl("/api/v1/invitations?status=active")).toBe(
+      "/api/v1/invitations?status=active",
+    );
+  });
+
+  it("leaves unrelated URLs byte-for-byte unchanged", () => {
+    expect(redactUrl("/api/v1/auth/me")).toBe("/api/v1/auth/me");
+    expect(redactUrl("/invite/some-client-side-route")).toBe("/invite/some-client-side-route");
+  });
+
+  // Load-bearing wiring check: the masking function is worthless unless the
+  // serializer that calls it is actually installed on the pino instance that
+  // Fastify logs through. This asserts the serializer path, not just the regex.
+  it("is applied to req.url through the configured logger's serializer", () => {
+    const { lines, stream } = capture();
+    const log = createLogger({ level: "info", production: true }, stream);
+    const token = "leaky-invite-token-abc123";
+
+    log.info({ req: { method: "GET", url: `/api/v1/invitations/${token}` } }, "incoming request");
+
+    const raw = lines[0]!;
+    expect(raw).not.toContain(token);
+
+    const entry = JSON.parse(raw) as { req: { method: string; url: string } };
+    expect(entry.req.url).toBe("/api/v1/invitations/[redacted]");
+    expect(entry.req.method).toBe("GET");
   });
 });
 

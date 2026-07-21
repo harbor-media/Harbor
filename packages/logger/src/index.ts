@@ -1,4 +1,10 @@
-import { pino, type DestinationStream, type Logger, type LoggerOptions as PinoOptions } from "pino";
+import {
+  pino,
+  stdSerializers,
+  type DestinationStream,
+  type Logger,
+  type LoggerOptions as PinoOptions,
+} from "pino";
 
 export type { Logger } from "pino";
 
@@ -47,6 +53,61 @@ const REDACT_PATHS = [
   'res.headers["set-cookie"]',
 ];
 
+// The public invite-inspection route puts the raw invite token in the URL
+// PATH (GET /api/v1/invitations/:token) rather than a request body, unlike
+// every other bearer secret in Harbor (passwords, the register token). Fastify
+// logs `method` + `url` for every request via its `req` serializer, so that
+// token would otherwise land in access logs in plaintext. REDACT_PATHS above
+// cannot help: pino's `redact.paths` matches object KEYS, not a substring
+// inside a `url` string value. Deliberately scoped to one path segment after
+// "/api/v1/invitations/" so it only touches the token-bearing inspect route —
+// the admin list route (`GET /api/v1/invitations`, no trailing segment) and
+// every unrelated URL pass through unchanged.
+const INVITE_TOKEN_URL_PATTERN = /(\/api\/v1\/invitations\/)[^/?]+/;
+
+export function redactUrl(url: string): string {
+  return url.replace(INVITE_TOKEN_URL_PATTERN, "$1[redacted]");
+}
+
+// Fastify logs requests via `request.log.info({ req: request }, ...)`, where
+// `request` is the Fastify request object (method/url/headers/host/ip/socket
+// all proxy through to the raw Node request). When Fastify is constructed
+// with `loggerInstance` (as Harbor's app.ts does), it merges its own default
+// req/res/err serializers with whatever serializers this pino instance itself
+// was built with — so overriding `req` here is what actually reaches
+// Fastify's automatic request/response logs, not just calls made directly
+// against this logger. `res` and `err` are restated to match Fastify's own
+// defaults exactly (`{ statusCode }` and pino's standard error serializer)
+// so this override changes ONLY what happens to `req.url` and leaves
+// response/error logging behavior untouched.
+interface SerializableRequest {
+  method?: string;
+  url?: string;
+  headers?: Record<string, string | string[] | undefined>;
+  host?: string;
+  ip?: string;
+  socket?: { remotePort?: number };
+}
+
+interface SerializableResponse {
+  statusCode: number;
+}
+
+function reqSerializer(request: SerializableRequest): Record<string, unknown> {
+  return {
+    method: request.method,
+    url: request.url === undefined ? undefined : redactUrl(request.url),
+    version: request.headers?.["accept-version"],
+    host: request.host,
+    remoteAddress: request.ip,
+    remotePort: request.socket?.remotePort,
+  };
+}
+
+function resSerializer(reply: SerializableResponse): Record<string, unknown> {
+  return { statusCode: reply.statusCode };
+}
+
 export function createLogger(options: LoggerOptions, destination?: DestinationStream): Logger {
   const base: PinoOptions = {
     level: options.level,
@@ -54,6 +115,11 @@ export function createLogger(options: LoggerOptions, destination?: DestinationSt
     timestamp: pino.stdTimeFunctions.isoTime,
     formatters: { level: (label) => ({ level: label }) },
     redact: { paths: REDACT_PATHS, censor: "[REDACTED]" },
+    serializers: {
+      req: reqSerializer,
+      res: resSerializer,
+      err: stdSerializers.err,
+    },
   };
 
   if (destination) return pino(base, destination);
