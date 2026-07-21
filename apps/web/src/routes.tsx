@@ -3,6 +3,7 @@ import type { JSX } from "react";
 import { createBrowserRouter, Navigate, Outlet, useLocation } from "react-router";
 import { useInstallationState } from "./api";
 import { useCurrentUser } from "./auth";
+import { AdminMetadata } from "./pages/AdminMetadata";
 import { Home } from "./pages/Home";
 import { Invite } from "./pages/Invite";
 import { Invitations } from "./pages/Invitations";
@@ -72,6 +73,7 @@ export const router = createBrowserRouter([
       { path: "register", Component: Register },
       { path: "home", Component: Home },
       { path: "admin/invitations", Component: Invitations },
+      { path: "admin/metadata", Component: AdminMetadata },
     ],
   },
 ]);
