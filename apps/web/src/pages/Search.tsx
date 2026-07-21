@@ -1,9 +1,48 @@
 import { type FormEvent, type JSX, useState } from "react";
 import { Link } from "react-router";
+import { imageUrl } from "../images";
 import { ApiError, describeMetadataError, useSearch } from "../metadata";
 
 const TMDB_ATTRIBUTION =
   "This product uses the TMDB API but is not endorsed or certified by TMDB.";
+
+/**
+ * The box is always the same size whether or not an image loads, so results
+ * never reflow as posters arrive.
+ *
+ * The placeholder lives here rather than on the server on purpose: a
+ * placeholder served as a 200 image would be cached by the browser as though
+ * it were the real poster, so one transient provider blip would pin a grey box
+ * until the cache expired. The server returns an error status, and this
+ * decides what to draw.
+ */
+function Poster({ path, title }: { path: string | null; title: string }): JSX.Element {
+  const src = imageUrl(path);
+  const [failed, setFailed] = useState(false);
+
+  if (src === null || failed) {
+    return (
+      <div
+        aria-hidden="true"
+        className="h-[105px] w-[70px] shrink-0 rounded bg-harbor-800"
+      />
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={`Poster for ${title}`}
+      loading="lazy"
+      width={70}
+      height={105}
+      className="h-[105px] w-[70px] shrink-0 rounded object-cover"
+      onError={() => {
+        setFailed(true);
+      }}
+    />
+  );
+}
 
 /**
  * Deliberately plain scaffolding. Its job is to prove the metadata pipeline
@@ -83,14 +122,17 @@ export function Search(): JSX.Element {
 
             <ul className="mt-4">
               {results.data.results.map((item) => (
-                <li key={item.id} className="mt-2 rounded bg-harbor-950 p-3">
-                  <p className="text-sm">
-                    {item.title}
-                    {item.year === null ? "" : ` (${String(item.year)})`} · {item.type}
-                  </p>
-                  {item.overview === null ? null : (
-                    <p className="mt-1 text-xs opacity-70">{item.overview}</p>
-                  )}
+                <li key={item.id} className="mt-2 flex gap-3 rounded bg-harbor-950 p-3">
+                  <Poster path={item.posterPath} title={item.title} />
+                  <div className="min-w-0">
+                    <p className="text-sm">
+                      {item.title}
+                      {item.year === null ? "" : ` (${String(item.year)})`} · {item.type}
+                    </p>
+                    {item.overview === null ? null : (
+                      <p className="mt-1 text-xs opacity-70">{item.overview}</p>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>
