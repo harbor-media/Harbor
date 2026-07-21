@@ -5,8 +5,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { HarborError } from "../../plugins/errors.js";
 import { requireRole } from "../../plugins/require-role.js";
-import { MetadataNotConfiguredError } from "./config.js";
-import { createTmdbProvider } from "./providers/tmdb.js";
+import { MetadataNotConfiguredError, tmdbFactory } from "./config.js";
 import { MetadataProviderError } from "./providers/types.js";
 import { searchTitles } from "./search.js";
 
@@ -81,7 +80,7 @@ export const metadataRoutes: FastifyPluginAsync = async (fastify) => {
         throw new HarborError("VALIDATION_FAILED", z.prettifyError(parsed.error), 400);
       }
       try {
-        await createTmdbProvider(parsed.data.apiKey).validateConfiguration(
+        await tmdbFactory(fastify.env.HARBOR_TMDB_BASE_URL)(parsed.data.apiKey).validateConfiguration(
           AbortSignal.timeout(VALIDATE_TIMEOUT_MS),
         );
       } catch (error) {
@@ -107,7 +106,7 @@ export const metadataRoutes: FastifyPluginAsync = async (fastify) => {
       // Validate before persisting, so an administrator cannot save a key
       // that does not work and then wonder why search is broken.
       try {
-        await createTmdbProvider(apiKey).validateConfiguration(
+        await tmdbFactory(fastify.env.HARBOR_TMDB_BASE_URL)(apiKey).validateConfiguration(
           AbortSignal.timeout(VALIDATE_TIMEOUT_MS),
         );
       } catch (error) {
@@ -137,7 +136,11 @@ export const metadataRoutes: FastifyPluginAsync = async (fastify) => {
       }
       try {
         return await searchTitles(
-          { db: fastify.db, harborSecret: fastify.env.HARBOR_SECRET },
+          {
+            db: fastify.db,
+            harborSecret: fastify.env.HARBOR_SECRET,
+            tmdbBaseUrl: fastify.env.HARBOR_TMDB_BASE_URL,
+          },
           parsed.data.q,
         );
       } catch (error) {

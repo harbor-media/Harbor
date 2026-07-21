@@ -11,6 +11,14 @@ const EnvSchema = z.object({
   HARBOR_LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
   HARBOR_TRUST_PROXY: z.stringbool().default(false),
   HARBOR_VERSION: z.string().default("0.1.0-dev"),
+  // Overrides the TMDB API base URL. Set by the end-to-end suite to point at
+  // a local fixture so tests never depend on -- or hammer -- the real TMDB,
+  // and usable in production by operators who reach TMDB through a mirror or
+  // egress proxy. It is deliberately an environment variable rather than a
+  // database setting: like DATABASE_URL it is operator-controlled
+  // infrastructure, so it carries no SSRF exposure from ordinary users, who
+  // can never influence it.
+  HARBOR_TMDB_BASE_URL: z.url({ protocol: /^https?$/ }).optional(),
 });
 
 export type HarborEnv = z.infer<typeof EnvSchema>;

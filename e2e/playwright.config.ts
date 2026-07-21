@@ -3,6 +3,12 @@ import { defineConfig, devices } from "@playwright/test";
 const PORT = 3100;
 const BASE_URL = `http://127.0.0.1:${String(PORT)}`;
 
+// The suite must never call the real TMDB: that would make it fail on a
+// third party's outage, require a real credential in CI, and load someone
+// else's servers on every run. Harbor is pointed at a local fixture instead.
+const TMDB_FIXTURE_PORT = 3101;
+const TMDB_FIXTURE_URL = `http://127.0.0.1:${String(TMDB_FIXTURE_PORT)}`;
+
 // E2E_DATABASE_URL is always set by scripts/run-e2e.mjs (the `test:e2e`
 // entrypoint), which either starts a disposable PostgreSQL container on its
 // own port or uses a caller-provided database. Playwright itself never
@@ -27,13 +33,30 @@ export default defineConfig({
   // default, which interleaves them and breaks that shared-state ordering.
   // Pin to a single worker so the whole suite runs as one serial sequence,
   // file order matching alphabetical `testDir` discovery.
+  //
+  // Because that ordering is load-bearing rather than incidental, spec files
+  // carry explicit numeric prefixes (01-, 02-, 03-). Without them a new spec
+  // silently sorts wherever its name happens to fall -- a metadata spec added
+  // as `metadata.spec.ts` ran before `setup-and-login.spec.ts` and failed on a
+  // missing owner account, with nothing in the failure pointing at ordering.
   workers: 1,
   forbidOnly: !!process.env["CI"],
   retries: process.env["CI"] ? 2 : 0,
   reporter: process.env["CI"] ? "list" : "html",
   use: { baseURL: BASE_URL, trace: "on-first-retry" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
-  webServer: {
+  webServer: [
+    {
+      command: "node ./scripts/tmdb-fixture.mjs",
+      url: `${TMDB_FIXTURE_URL}/authentication`,
+      timeout: 30_000,
+      reuseExistingServer: false,
+      // The fixture answers 401 without a bearer token, which is exactly what
+      // Playwright's readiness probe sends. Treat that as "up".
+      ignoreHTTPSErrors: true,
+      env: { TMDB_FIXTURE_PORT: String(TMDB_FIXTURE_PORT) },
+    },
+    {
     command: "node ../apps/server/dist/server.js",
     // /health/ready, not /health: boot.ts binds the listener BEFORE migrations
     // run, so /health answers 200 while the schema is still being created.
@@ -53,6 +76,8 @@ export default defineConfig({
       HARBOR_DATA_DIRECTORY: "./.e2e-data",
       HARBOR_LOG_LEVEL: "warn",
       DATABASE_URL: databaseUrl,
+      HARBOR_TMDB_BASE_URL: TMDB_FIXTURE_URL,
     },
-  },
+    },
+  ],
 });

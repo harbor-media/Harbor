@@ -18,6 +18,8 @@ export interface SearchDeps {
   harborSecret: string;
   now?: () => Date;
   providerFactory?: (apiKey: string) => MetadataProvider;
+  /** Operator override for the TMDB base URL; ignored when providerFactory is given. */
+  tmdbBaseUrl?: string;
 }
 
 /** Normalizes case and surrounding whitespace so trivially different
@@ -39,7 +41,12 @@ function toResultItem(title: StoredTitle): SearchResultItem {
 
 export async function searchTitles(deps: SearchDeps, rawQuery: string): Promise<SearchResponse> {
   const now = deps.now ?? (() => new Date());
-  const { provider, language } = await loadProvider(deps.db, deps.harborSecret, deps.providerFactory);
+  const { provider, language } = await loadProvider(
+    deps.db,
+    deps.harborSecret,
+    deps.providerFactory,
+    deps.tmdbBaseUrl,
+  );
   const queryHash = hashSearchQuery(rawQuery);
 
   const cachedIds = await readSearchCache(deps.db, queryHash, language, now());

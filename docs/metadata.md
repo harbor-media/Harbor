@@ -81,6 +81,21 @@ A metadata outage never affects Harbor's readiness check. The server does not
 report itself unhealthy because a third party is down, since that would make
 an orchestrator restart a working container.
 
+## Optional: pointing Harbor at a TMDB mirror
+
+`HARBOR_TMDB_BASE_URL` overrides the TMDB API endpoint. Leave it unset unless
+you reach TMDB through a mirror or an egress proxy.
+
+```
+HARBOR_TMDB_BASE_URL=https://tmdb-proxy.internal/3
+```
+
+This is an environment variable rather than a UI setting on purpose. Like
+`DATABASE_URL`, it is infrastructure the server owner controls; no Harbor
+user can influence it, so it carries no request-forgery exposure. Harbor's
+end-to-end suite uses it to point at a local fixture so tests never call the
+real TMDB.
+
 ## Rate limits
 
 The search endpoint is limited to 60 requests per minute per client, and the
