@@ -1,9 +1,11 @@
 import { access, constants, mkdir } from "node:fs/promises";
+import path from "node:path";
 import { loadEnv } from "@harbor/config";
 import { closeClient, createClient, isSetupComplete } from "@harbor/database";
 import { createLogger, type Logger } from "@harbor/logger";
 import { createApp, type HarborApp } from "./app.js";
 import { connectWithRetry, ensureDatabaseInitialized } from "./database-lifecycle.js";
+import { startEvictionSweep } from "./modules/images/scheduler.js";
 import { createRuntimeState } from "./state.js";
 
 export interface Bootstrapped {
@@ -71,8 +73,17 @@ export async function bootstrap(): Promise<Bootstrapped> {
 
   logger.info({ ready: state.databaseReady && state.migrationsApplied && state.dataDirectoryWritable }, "boot complete");
 
+  // Bounds the image cache on a timer. Started after the data directory
+  // check so a broken volume is reported before a sweep touches it.
+  const imageSweep = startEvictionSweep({
+    root: path.join(env.HARBOR_DATA_DIRECTORY, "cache", "images"),
+    maxBytes: env.HARBOR_CACHE_MAX_SIZE,
+    logger,
+  });
+
   const shutdown = async (): Promise<void> => {
     logger.info("shutting down");
+    imageSweep.stop();
     await app.close();
     await closeClient(sql);
     logger.info("shutdown complete");
