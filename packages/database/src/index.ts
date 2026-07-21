@@ -8,4 +8,5 @@ export * from "./registration.js";
 export * from "./schema.js";
 export * from "./sessions.js";
 export * from "./setup.js";
+export * from "./titles.js";
 export * from "./users.js";
