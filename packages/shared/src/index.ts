@@ -9,6 +9,9 @@ export const ERROR_CODES = [
   "FORBIDDEN",
   "INVITATION_INVALID",
   "REGISTRATION_DISABLED",
+  "METADATA_NOT_CONFIGURED",
+  "METADATA_PROVIDER_UNAVAILABLE",
+  "METADATA_PROVIDER_UNAUTHORIZED",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -196,4 +199,32 @@ export interface RegisterRequest {
 
 export interface RegisterResponse {
   user: AuthenticatedUser;
+}
+
+/**
+ * What the API is willing to say about a configured provider. There is
+ * deliberately no field carrying the key, masked or otherwise: a masked key
+ * is still a partial credential disclosure, and the UI has no use for it.
+ */
+export interface MetadataConfigStatus {
+  configured: boolean;
+  enabled: boolean;
+  language: string;
+  lastVerifiedAt: string | null;
+}
+
+export interface SearchResultItem {
+  id: string;
+  type: "movie" | "series";
+  title: string;
+  year: number | null;
+  overview: string | null;
+  posterPath: string | null;
+}
+
+export interface SearchResponse {
+  results: SearchResultItem[];
+  /** True when served from Harbor's cache without contacting the provider.
+   *  Exposed so the cache is observable in the UI and assertable in tests. */
+  cached: boolean;
 }
