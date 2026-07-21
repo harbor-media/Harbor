@@ -127,6 +127,36 @@ mkdir -p /path/to/harbor-data
 chown -R 100:100 /path/to/harbor-data
 ```
 
+## Invitations and registration
+
+Registration defaults to `invitation-only`. An owner or administrator creates
+an invite from `POST /api/v1/invitations` (also `GET /api/v1/invitations` to
+list, `DELETE /api/v1/invitations/:id` to revoke), choosing a `role`, an
+optional `email` binding, `maxUses`, and `expiresInDays`. The response
+includes the raw token and an `inviteUrl` of
+`${HARBOR_BASE_URL}/invite/<token>` — that's the only time the token is ever
+returned; only its hash is stored, and list responses never include it.
+
+The granting rule is enforced server-side in the route (`roleRank(role) >=
+roleRank(actor.role)` is rejected): you can only grant a role ranked below
+your own (`owner` > `administrator` > `user` > `guest`), so an administrator
+can invite a `user` or `guest` but never an `administrator`, and no invite
+can ever grant `owner`. The web admin page at `/admin/invitations` filters
+its role dropdown to match.
+
+`GET /api/v1/invitations/:token` is a public, unauthenticated inspection
+endpoint (used by the `/invite/:token` page) that returns the same negative
+response for a missing, spent, expired, or revoked token, so it can't be used
+to enumerate valid tokens. `POST /api/v1/register` redeems the token,
+creates the account with the granted role, and signs the user in — matching
+against an email-bound invite is required if one was set.
+
+Registration mode is read/written via `GET`/`PATCH
+/api/v1/settings/registration` (`disabled` | `invitation-only` | `open`).
+Switching to `open` requires `acknowledgeOpenRisk: true` in the request body,
+enforced server-side regardless of what the UI sends; in `open` mode
+`/register` is reachable and the login page shows a "Create account" link.
+
 ## End-to-end tests
 
 Playwright drives a real browser against a built server on port 3100 (chosen
@@ -134,7 +164,9 @@ to sidestep the common port-3000 conflict). The suite is self-contained:
 `pnpm test:e2e` (`e2e/scripts/run-e2e.mjs`) starts its own disposable
 PostgreSQL container, runs Playwright against a server it boots itself, and
 tears the container down afterward — no manual `docker compose` step is
-required.
+required. The suite now covers the invitation journey (owner invites a
+user, role-dropdown restrictions, email-bound and spent/invalid tokens) and
+the open-registration journey, alongside the original setup-and-login flow.
 
 ```bash
 pnpm build
