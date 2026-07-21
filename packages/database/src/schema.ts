@@ -208,5 +208,5 @@ export type NewInvitation = typeof invitations.$inferInsert;
 export type MetadataProviderConfig = typeof metadataProviderConfig.$inferSelect;
 export type Title = typeof titles.$inferSelect;
 export type NewTitle = typeof titles.$inferInsert;
-export type TitleExternalId = typeof titleExternalIds.$inferSelect;
+export type TitleExternalIdRow = typeof titleExternalIds.$inferSelect;
 export type MetadataSearchCache = typeof metadataSearchCache.$inferSelect;
