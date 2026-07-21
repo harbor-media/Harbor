@@ -20,6 +20,7 @@
     "@fastify/rate-limit": "11.1.0",
     "@fastify/static": "10.1.0",
     "@harbor/config": "workspace:*",
+    "@harbor/crypto": "workspace:*",
     "@harbor/database": "workspace:*",
     "@harbor/logger": "workspace:*",
     "@harbor/shared": "workspace:*",
@@ -28,7 +29,9 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@testcontainers/postgresql": "12.0.4",
     "@types/node": "24.13.3",
+    "testcontainers": "12.0.4",
     "tsx": "4.23.1",
     "typescript": "6.0.3",
     "vitest": "4.1.10"
