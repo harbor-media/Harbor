@@ -7,6 +7,13 @@ COPY pnpm-workspace.yaml package.json pnpm-lock.yaml .npmrc ./
 COPY apps/server/package.json ./apps/server/
 COPY apps/web/package.json ./apps/web/
 COPY packages/config/package.json ./packages/config/
+# Every workspace package needs its manifest listed here before `pnpm install`,
+# or the install creates no node_modules for it and its build fails inside the
+# image with a misleading "Cannot find type definition file for 'node'" --
+# while `pnpm build` on a developer machine passes, because there the install
+# already covered the whole workspace. Adding a package under packages/ means
+# adding a line here.
+COPY packages/crypto/package.json ./packages/crypto/
 COPY packages/database/package.json ./packages/database/
 COPY packages/logger/package.json ./packages/logger/
 COPY packages/shared/package.json ./packages/shared/
