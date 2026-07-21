@@ -1,4 +1,3 @@
-import type { Logger } from "@harbor/logger";
 import { cacheFilePath, statCached, writeAtomic } from "./cache.js";
 import type { ImageProviderId } from "./providers.js";
 import { fetchUpstreamImage, ImageFetchError, MAX_IMAGE_BYTES } from "./upstream.js";
@@ -10,6 +9,16 @@ const DEFAULT_NEGATIVE_TTL_MS = 60 * 60 * 1000;
  *  without limit. Oldest entries are dropped first. */
 const NEGATIVE_CACHE_MAX_ENTRIES = 1000;
 
+/**
+ * The one logging call this service makes. Declared structurally rather than
+ * as pino's `Logger` so it accepts both the root logger and Fastify's
+ * per-request `FastifyBaseLogger`, which are different types for the same
+ * thing -- and so tests can pass a two-line fake.
+ */
+export interface ImageServiceLogger {
+  error: (details: Record<string, unknown>, message: string) => void;
+}
+
 export interface ImageServiceOptions {
   cacheRoot: string;
   baseUrls: Record<ImageProviderId, string>;
@@ -17,7 +26,7 @@ export interface ImageServiceOptions {
   now?: () => number;
   negativeTtlMs?: number;
   /** Optional so tests can construct the service without one. */
-  logger?: Logger;
+  logger?: ImageServiceLogger;
 }
 
 export type ServedImage =
