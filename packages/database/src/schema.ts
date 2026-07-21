@@ -5,8 +5,10 @@ import {
   inet,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -138,9 +140,73 @@ export const invitations = pgTable(
   ],
 );
 
+export const titleType = pgEnum("title_type", ["movie", "series"]);
+
+export const externalIdSource = pgEnum("external_id_source", ["tmdb", "imdb"]);
+
+export const metadataProviderConfig = pgTable("metadata_provider_config", {
+  providerId: text("provider_id").primaryKey(),
+  enabled: boolean("enabled").notNull().default(false),
+  encryptedApiKey: text("encrypted_api_key"),
+  language: text("language").notNull().default("en-US"),
+  lastVerifiedAt: timestamp("last_verified_at", { withTimezone: true, mode: "date" }),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});
+
+export const titles = pgTable(
+  "titles",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    type: titleType("type").notNull(),
+    title: text("title").notNull(),
+    originalTitle: text("original_title"),
+    year: integer("year"),
+    overview: text("overview"),
+    posterPath: text("poster_path"),
+    backdropPath: text("backdrop_path"),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [index("titles_title_idx").on(t.title)],
+);
+
+export const titleExternalIds = pgTable(
+  "title_external_ids",
+  {
+    titleId: uuid("title_id")
+      .notNull()
+      .references(() => titles.id, { onDelete: "cascade" }),
+    source: externalIdSource("source").notNull(),
+    externalId: text("external_id").notNull(),
+  },
+  (t) => [
+    // The natural key for a title. Upserts target this, never the display
+    // title -- two films can share a name and must stay distinct rows.
+    uniqueIndex("title_external_ids_source_external_idx").on(t.source, t.externalId),
+    index("title_external_ids_title_idx").on(t.titleId),
+  ],
+);
+
+export const metadataSearchCache = pgTable(
+  "metadata_search_cache",
+  {
+    queryHash: text("query_hash").notNull(),
+    language: text("language").notNull(),
+    // Ordered: this array IS the provider's relevance ranking. Anything that
+    // reads it must preserve order.
+    titleIds: jsonb("title_ids").$type<string[]>().notNull(),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.queryHash, t.language] })],
+);
+
 export type Installation = typeof installation.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Session = typeof sessions.$inferSelect;
 export type Invitation = typeof invitations.$inferSelect;
 export type NewInvitation = typeof invitations.$inferInsert;
+export type MetadataProviderConfig = typeof metadataProviderConfig.$inferSelect;
+export type Title = typeof titles.$inferSelect;
+export type NewTitle = typeof titles.$inferInsert;
+export type TitleExternalId = typeof titleExternalIds.$inferSelect;
+export type MetadataSearchCache = typeof metadataSearchCache.$inferSelect;
