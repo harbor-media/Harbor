@@ -9,6 +9,12 @@ const BASE_URL = `http://127.0.0.1:${String(PORT)}`;
 const TMDB_FIXTURE_PORT = 3101;
 const TMDB_FIXTURE_URL = `http://127.0.0.1:${String(TMDB_FIXTURE_PORT)}`;
 
+// The image CDN is a SEPARATE host from the metadata API, so it needs its own
+// fixture and its own override. Reusing the metadata one would send image
+// requests to the API fixture and fail confusingly.
+const IMAGE_FIXTURE_PORT = 3102;
+const IMAGE_FIXTURE_URL = `http://127.0.0.1:${String(IMAGE_FIXTURE_PORT)}`;
+
 // E2E_DATABASE_URL is always set by scripts/run-e2e.mjs (the `test:e2e`
 // entrypoint), which either starts a disposable PostgreSQL container on its
 // own port or uses a caller-provided database. Playwright itself never
@@ -57,6 +63,13 @@ export default defineConfig({
       env: { TMDB_FIXTURE_PORT: String(TMDB_FIXTURE_PORT) },
     },
     {
+      command: "node ./scripts/image-fixture.mjs",
+      url: `${IMAGE_FIXTURE_URL}/count`,
+      timeout: 30_000,
+      reuseExistingServer: false,
+      env: { IMAGE_FIXTURE_PORT: String(IMAGE_FIXTURE_PORT) },
+    },
+    {
     command: "node ../apps/server/dist/server.js",
     // /health/ready, not /health: boot.ts binds the listener BEFORE migrations
     // run, so /health answers 200 while the schema is still being created.
@@ -77,6 +90,7 @@ export default defineConfig({
       HARBOR_LOG_LEVEL: "warn",
       DATABASE_URL: databaseUrl,
       HARBOR_TMDB_BASE_URL: TMDB_FIXTURE_URL,
+      HARBOR_TMDB_IMAGE_BASE_URL: IMAGE_FIXTURE_URL,
     },
     },
   ],
