@@ -11,6 +11,13 @@ const EnvSchema = z.object({
   HARBOR_LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
   HARBOR_TRUST_PROXY: z.stringbool().default(false),
   HARBOR_VERSION: z.string().default("0.1.0-dev"),
+  // Maximum bytes the image cache may occupy before the sweep evicts.
+  HARBOR_CACHE_MAX_SIZE: z.coerce.number().int().min(0).default(2_147_483_648),
+  // Overrides the image CDN base URL. This is a SEPARATE host from
+  // HARBOR_TMDB_BASE_URL below: metadata comes from api.themoviedb.org,
+  // images from image.tmdb.org. Pointing one at the other silently breaks
+  // whichever it was not meant for.
+  HARBOR_TMDB_IMAGE_BASE_URL: z.url({ protocol: /^https?$/ }).optional(),
   // Overrides the TMDB API base URL. Set by the end-to-end suite to point at
   // a local fixture so tests never depend on -- or hammer -- the real TMDB,
   // and usable in production by operators who reach TMDB through a mirror or
