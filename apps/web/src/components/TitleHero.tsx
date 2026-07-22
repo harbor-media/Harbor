@@ -1,5 +1,6 @@
 import type { TitleDetailResponse } from "@harbor/shared";
 import type { JSX } from "react";
+import { PlayIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -84,7 +85,11 @@ export function TitleHeader({
               hint on its own about why. */}
           <span title="Playback arrives in a later phase">
             <Button size="lg" className="rounded-full px-8" isDisabled>
-              ▶ Play
+              {/* An icon, not a bare U+25B6: the glyph lands in the button's
+                  accessible name, which a screen reader reads out as "black
+                  right-pointing triangle, Play". */}
+              <PlayIcon className="size-4" aria-hidden="true" />
+              Play
             </Button>
           </span>
           <span title="The library arrives in a later phase">

@@ -273,6 +273,55 @@ describe("fetchSeasonDetail", () => {
     expect(calls.season).toBe(0);
   });
 
+  // The season path has the same degraded branch as the title path, and it
+  // needs the same two-sided proof: without these, deleting the branch
+  // outright -- or widening it to any provider error -- left the suite green.
+  it("serves stale episodes when the provider is unavailable", async () => {
+    await configure();
+    const id = await seedSeries();
+    const calls: Calls = { detail: 0, season: 0 };
+    const provider = fakeProvider(calls);
+    await fetchTitleDetail(deps(provider), id);
+    await fetchSeasonDetail(deps(provider), id, 1);
+
+    const result = await fetchSeasonDetail(
+      deps(failing("unavailable"), () => new Date(Date.now() + DAY_MS + 60_000)),
+      id,
+      1,
+    );
+
+    expect(result.episodes).toHaveLength(2);
+    expect(result.episodes[0]?.name).toBe("Pilot");
+    expect(result.cached).toBe(true);
+  });
+
+  it("does not serve stale episodes when the provider rejects the key", async () => {
+    await configure();
+    const id = await seedSeries();
+    const calls: Calls = { detail: 0, season: 0 };
+    const provider = fakeProvider(calls);
+    await fetchTitleDetail(deps(provider), id);
+    await fetchSeasonDetail(deps(provider), id, 1);
+
+    await expect(
+      fetchSeasonDetail(
+        deps(failing("unauthorized"), () => new Date(Date.now() + DAY_MS + 60_000)),
+        id,
+        1,
+      ),
+    ).rejects.toMatchObject({ kind: "unauthorized" });
+  });
+
+  it("rethrows when the provider is unavailable and no episodes were stored", async () => {
+    await configure();
+    const id = await seedSeries();
+    await fetchTitleDetail(deps(fakeProvider({ detail: 0, season: 0 })), id);
+
+    await expect(
+      fetchSeasonDetail(deps(failing("unavailable")), id, 1),
+    ).rejects.toBeInstanceOf(MetadataProviderError);
+  });
+
   it("rejects an unknown title id", async () => {
     await configure();
     await expect(

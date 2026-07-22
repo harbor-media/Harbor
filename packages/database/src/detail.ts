@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, notInArray, sql } from "drizzle-orm";
 import type { Db } from "./client.js";
 import { episodes, seasons, titleExternalIds, titles } from "./schema.js";
 import type { StoredTitle, TitleExternalId } from "./titles.js";
@@ -68,58 +68,88 @@ export async function getTitleDetail(db: Db, id: string): Promise<StoredTitleDet
   };
 }
 
+/**
+ * Writes a title's detail and its season list as one atomic unit.
+ *
+ * The two must not be separate statements. `detailFetchedAt` is what marks
+ * the title fresh for the whole TTL, so committing it before the seasons
+ * land means a failure in between (dropped connection, statement timeout,
+ * SIGTERM mid-loop) leaves a title that is *fresh* but holds a truncated
+ * season list. Every later request takes the cache-hit path and returns the
+ * short list without ever retrying -- a 25-season show silently missing 19
+ * seasons, unrecoverable for 24 hours without an operator UPDATE.
+ *
+ * Seasons the provider no longer lists are deleted, for the same reason
+ * `replaceEpisodes` deletes rather than upserts: an upsert-only policy
+ * leaves a phantom row no refetch removes. A phantom season is worse than a
+ * phantom episode, because opening it asks the provider for a season that
+ * does not exist -- a 404, which maps to `unavailable`, which the degraded
+ * path then serves from cache forever. Episodes cascade from the season, so
+ * the delete takes their rows with it.
+ *
+ * The prune is skipped when `seasonList` is empty. That covers movies, which
+ * have no seasons at all, and refuses to read an empty provider payload as
+ * "this series lost every season".
+ */
 export async function saveTitleDetail(
   db: Db,
   id: string,
   update: TitleDetailUpdate,
+  seasonList: NormalizedSeason[],
   now: Date,
 ): Promise<void> {
-  await db
-    .update(titles)
-    .set({
-      originalTitle: update.originalTitle,
-      year: update.year,
-      overview: update.overview,
-      posterPath: update.posterPath,
-      backdropPath: update.backdropPath,
-      runtime: update.runtime,
-      genres: update.genres,
-      detailFetchedAt: now,
-      fetchedAt: now,
-    })
-    .where(eq(titles.id, id));
-}
-
-export async function upsertSeasons(
-  db: Db,
-  titleId: string,
-  items: NormalizedSeason[],
-): Promise<void> {
-  if (items.length === 0) return;
-
-  for (const item of items) {
-    await db
-      .insert(seasons)
-      .values({
-        titleId,
-        seasonNumber: item.seasonNumber,
-        name: item.name,
-        overview: item.overview,
-        posterPath: item.posterPath,
-        episodeCount: item.episodeCount,
-        airDate: item.airDate,
-      })
-      .onConflictDoUpdate({
-        target: [seasons.titleId, seasons.seasonNumber],
-        set: {
+  await db.transaction(async (tx) => {
+    for (const item of seasonList) {
+      await tx
+        .insert(seasons)
+        .values({
+          titleId: id,
+          seasonNumber: item.seasonNumber,
           name: item.name,
           overview: item.overview,
           posterPath: item.posterPath,
           episodeCount: item.episodeCount,
           airDate: item.airDate,
-        },
-      });
-  }
+        })
+        .onConflictDoUpdate({
+          target: [seasons.titleId, seasons.seasonNumber],
+          set: {
+            name: item.name,
+            overview: item.overview,
+            posterPath: item.posterPath,
+            episodeCount: item.episodeCount,
+            airDate: item.airDate,
+          },
+        });
+    }
+
+    if (seasonList.length > 0) {
+      await tx.delete(seasons).where(
+        and(
+          eq(seasons.titleId, id),
+          notInArray(
+            seasons.seasonNumber,
+            seasonList.map((item) => item.seasonNumber),
+          ),
+        ),
+      );
+    }
+
+    await tx
+      .update(titles)
+      .set({
+        originalTitle: update.originalTitle,
+        year: update.year,
+        overview: update.overview,
+        posterPath: update.posterPath,
+        backdropPath: update.backdropPath,
+        runtime: update.runtime,
+        genres: update.genres,
+        detailFetchedAt: now,
+        fetchedAt: now,
+      })
+      .where(eq(titles.id, id));
+  });
 }
 
 export async function listSeasons(db: Db, titleId: string): Promise<NormalizedSeason[]> {
@@ -162,11 +192,18 @@ export async function replaceEpisodes(
   now: Date,
 ): Promise<boolean> {
   return db.transaction(async (tx) => {
+    // FOR UPDATE, so two requests for the same season serialize here.
+    // Without the lock, under READ COMMITTED the second transaction's DELETE
+    // takes its snapshot before the first commits, so it cannot see the rows
+    // the first is about to insert and deletes nothing -- then its own INSERT
+    // collides with the unique index on (season_id, episode_number) and a
+    // plain double-click on a season becomes a 500.
     const found = await tx
       .select({ id: seasons.id })
       .from(seasons)
       .where(and(eq(seasons.titleId, titleId), eq(seasons.seasonNumber, seasonNumber)))
-      .limit(1);
+      .limit(1)
+      .for("update");
 
     const season = found[0];
     if (!season) return false;

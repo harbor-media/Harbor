@@ -94,7 +94,13 @@ test("episode stills actually render", async ({ page }) => {
   await search(page, "Supernatural");
   await page.getByRole("link", { name: /supernatural/i }).first().click();
 
-  const still = page.getByRole("img", { name: "Pilot" });
+  // Located through its card rather than by accessible name: the still is
+  // decorative (alt=""), because the episode name is rendered as text right
+  // below it, so it is deliberately absent from the accessibility tree.
+  const still = page
+    .getByRole("listitem")
+    .filter({ hasText: "1. Pilot" })
+    .locator("img");
   await expect(still).toBeVisible();
 
   // naturalWidth, not visibility. A broken image is still "visible" to

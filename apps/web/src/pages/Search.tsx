@@ -20,7 +20,7 @@ const TMDB_ATTRIBUTION =
  * until the cache expired. The server returns an error status, and this
  * decides what to draw.
  */
-function Poster({ path, title }: { path: string | null; title: string }): JSX.Element {
+function Poster({ path }: { path: string | null }): JSX.Element {
   const src = imageUrl(path);
   const [failed, setFailed] = useState(false);
 
@@ -36,7 +36,10 @@ function Poster({ path, title }: { path: string | null; title: string }): JSX.El
   return (
     <img
       src={src}
-      alt={`Poster for ${title}`}
+      // Decorative. The whole row is one link whose accessible name is the
+      // title text beside it; describing the poster too prepends "Poster for
+      // X" to that name, so the link announces the title twice.
+      alt=""
       loading="lazy"
       width={70}
       height={105}
@@ -129,7 +132,7 @@ export function Search(): JSX.Element {
                     to={`/${item.type === "movie" ? "movie" : "series"}/${item.id}`}
                     className="flex gap-3 rounded-xl bg-card p-3 transition-colors hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
                   >
-                    <Poster path={item.posterPath} title={item.title} />
+                    <Poster path={item.posterPath} />
                     <div className="min-w-0">
                       <p className="text-sm text-foreground">
                         {item.title}

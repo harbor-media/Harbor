@@ -44,7 +44,13 @@ test("posters render in search results", async ({ page }) => {
   await page.getByLabel("Title").fill("Blade Runner");
   await page.getByRole("button", { name: /^search$/i }).click();
 
-  const poster = page.getByRole("img", { name: /poster for blade runner/i }).first();
+  // Located through its result row, not by accessible name: the poster is
+  // decorative (alt=""), since the row is one link already named by the title
+  // text beside it.
+  const poster = page
+    .getByRole("link", { name: /blade runner/i })
+    .first()
+    .locator("img");
   await expect(poster).toBeVisible();
 
   // A broken image is still "visible" to Playwright, so assert the browser

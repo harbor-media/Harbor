@@ -10,7 +10,7 @@ import { metaLine } from "../titles";
  * 22-episode season does not reflow row by row as stills arrive — the same
  * reason the search results reserve a poster box.
  */
-function Still({ path, label }: { path: string | null; label: string }): JSX.Element {
+function Still({ path }: { path: string | null }): JSX.Element {
   const src = imageUrl(path, "w300");
 
   if (src === null) {
@@ -20,7 +20,9 @@ function Still({ path, label }: { path: string | null; label: string }): JSX.Ele
   return (
     <img
       src={src}
-      alt={label}
+      // Decorative: the episode number and name are rendered as text
+      // directly below, so a description here is announced twice.
+      alt=""
       // A full season is a full season's worth of image requests; only the
       // cards actually scrolled to should cost one.
       loading="lazy"
@@ -43,7 +45,7 @@ export function EpisodeList({ episodes }: { episodes: EpisodeItem[] }): JSX.Elem
 
         return (
           <li key={episode.episodeNumber}>
-            <Still path={episode.stillPath} label={label} />
+            <Still path={episode.stillPath} />
 
             {/* Number and name on one line, as a viewer reads them aloud:
                 "episode three, Chitty Chitty Death Bang". */}

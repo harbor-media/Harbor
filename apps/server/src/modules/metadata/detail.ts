@@ -4,7 +4,6 @@ import {
   listSeasons,
   replaceEpisodes,
   saveTitleDetail,
-  upsertSeasons,
   type Db,
   type NormalizedSeason,
   type StoredTitleDetail,
@@ -126,6 +125,8 @@ export async function fetchTitleDetail(
     throw error;
   }
 
+  // One call, one transaction: the freshness stamp and the season list have
+  // to land together or a partial write is cached as complete.
   await saveTitleDetail(
     deps.db,
     titleId,
@@ -138,12 +139,9 @@ export async function fetchTitleDetail(
       runtime: detail.runtime,
       genres: detail.genres,
     },
+    detail.seasons,
     now(),
   );
-
-  if (detail.seasons.length > 0) {
-    await upsertSeasons(deps.db, titleId, detail.seasons);
-  }
 
   const stored = await getTitleDetail(deps.db, titleId);
   if (!stored) throw new TitleNotFoundError("No such title.");
@@ -214,7 +212,12 @@ export async function fetchSeasonDetail(
     throw error;
   }
 
-  await replaceEpisodes(deps.db, titleId, seasonNumber, episodes, now());
+  // False means the season row vanished while the provider call was in
+  // flight -- a concurrent refetch pruned it. Reporting the episodes we just
+  // failed to store, labelled cached: false, would claim a provenance that
+  // never happened.
+  const replaced = await replaceEpisodes(deps.db, titleId, seasonNumber, episodes, now());
+  if (!replaced) throw new TitleNotFoundError("No such season.");
 
   const stored = await getSeasonEpisodes(deps.db, titleId, seasonNumber);
   if (!stored) throw new TitleNotFoundError("No such season.");

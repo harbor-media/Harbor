@@ -10,7 +10,6 @@ import {
   listSeasons,
   replaceEpisodes,
   saveTitleDetail,
-  upsertSeasons,
 } from "./detail.js";
 import { runMigrations } from "./migrate.js";
 import { upsertTitles } from "./titles.js";
@@ -54,6 +53,31 @@ async function seedTitle(): Promise<string> {
     },
   ]);
   return ids[0]!;
+}
+
+/** Seasons only reach the database through saveTitleDetail, which writes
+ *  them with the title in one transaction. These tests care about the season
+ *  rows, so the detail fields are inert filler. */
+async function saveSeasons(
+  target: Db,
+  titleId: string,
+  items: Parameters<typeof saveTitleDetail>[3],
+): Promise<void> {
+  await saveTitleDetail(
+    target,
+    titleId,
+    {
+      originalTitle: null,
+      year: null,
+      overview: null,
+      posterPath: null,
+      backdropPath: null,
+      runtime: null,
+      genres: [],
+    },
+    items,
+    new Date(),
+  );
 }
 
 const SEASON_ONE = {
@@ -105,6 +129,7 @@ describe("saveTitleDetail", () => {
         runtime: 44,
         genres: ["Drama", "Mystery"],
       },
+      [],
       new Date(),
     );
 
@@ -117,7 +142,7 @@ describe("saveTitleDetail", () => {
   });
 });
 
-describe("upsertSeasons and listSeasons", () => {
+describe("saveTitleDetail seasons and listSeasons", () => {
   it("returns an empty list when nothing is stored", async () => {
     const id = await seedTitle();
     expect(await listSeasons(db, id)).toEqual([]);
@@ -127,7 +152,7 @@ describe("upsertSeasons and listSeasons", () => {
   // regardless of the order the provider returned them.
   it("returns seasons in season-number order", async () => {
     const id = await seedTitle();
-    await upsertSeasons(db, id, [
+    await saveSeasons(db, id, [
       { ...SEASON_ONE, seasonNumber: 3, name: "Season 3" },
       { ...SEASON_ONE, seasonNumber: 2, name: "Season 2" },
       SEASON_ONE,
@@ -143,7 +168,7 @@ describe("upsertSeasons and listSeasons", () => {
   // list, would be wrong too.
   it("sorts the specials season last, not first", async () => {
     const id = await seedTitle();
-    await upsertSeasons(db, id, [
+    await saveSeasons(db, id, [
       { ...SEASON_ONE, seasonNumber: 0, name: "Specials" },
       { ...SEASON_ONE, seasonNumber: 2, name: "Season 2" },
       SEASON_ONE,
@@ -156,8 +181,8 @@ describe("upsertSeasons and listSeasons", () => {
 
   it("updates an existing season rather than duplicating it", async () => {
     const id = await seedTitle();
-    await upsertSeasons(db, id, [SEASON_ONE]);
-    await upsertSeasons(db, id, [{ ...SEASON_ONE, name: "Renamed", episodeCount: 23 }]);
+    await saveSeasons(db, id, [SEASON_ONE]);
+    await saveSeasons(db, id, [{ ...SEASON_ONE, name: "Renamed", episodeCount: 23 }]);
 
     const rows = await listSeasons(db, id);
     expect(rows).toHaveLength(1);
@@ -180,11 +205,55 @@ describe("upsertSeasons and listSeasons", () => {
       },
     ]))[0]!;
 
-    await upsertSeasons(db, first, [SEASON_ONE]);
-    await upsertSeasons(db, second, [SEASON_ONE]);
+    await saveSeasons(db, first, [SEASON_ONE]);
+    await saveSeasons(db, second, [SEASON_ONE]);
 
     expect(await listSeasons(db, first)).toHaveLength(1);
     expect(await listSeasons(db, second)).toHaveLength(1);
+  });
+
+  it("drops a season the provider no longer lists", async () => {
+    const id = await seedTitle();
+    await saveSeasons(db, id, [SEASON_ONE, { ...SEASON_ONE, seasonNumber: 2, name: "Season 2" }]);
+    expect(await listSeasons(db, id)).toHaveLength(2);
+
+    // The provider now reports only season 1. Keeping season 2 would leave a
+    // row nothing ever removes, and opening it would ask the provider for a
+    // season that does not exist -- a 404, which the degraded path reads as
+    // an outage and answers from cache indefinitely.
+    await saveSeasons(db, id, [SEASON_ONE]);
+
+    const rows = await listSeasons(db, id);
+    expect(rows.map((season) => season.seasonNumber)).toEqual([1]);
+  });
+
+  it("does not treat an empty season list as every season being gone", async () => {
+    const id = await seedTitle();
+    await saveSeasons(db, id, [SEASON_ONE]);
+
+    // A movie has no seasons, and a series whose payload came back empty has
+    // told us nothing. Neither is a licence to delete what is already stored.
+    await saveSeasons(db, id, []);
+
+    expect(await listSeasons(db, id)).toHaveLength(1);
+  });
+
+  it("does not mark a title fresh when its seasons fail to store", async () => {
+    const id = await seedTitle();
+
+    // A season number too large for int4 fails on insert. The point is the
+    // failure lands mid-write, after the statements that would otherwise have
+    // already committed the freshness stamp.
+    await expect(
+      saveSeasons(db, id, [SEASON_ONE, { ...SEASON_ONE, seasonNumber: 2 ** 40 }]),
+    ).rejects.toThrow();
+
+    // Both halves must have rolled back together. A stamped detailFetchedAt
+    // here would mean the title is cached as complete while holding a
+    // truncated season list, and no refetch happens for the whole TTL.
+    const row = await getTitleDetail(db, id);
+    expect(row?.detailFetchedAt).toBeNull();
+    expect(await listSeasons(db, id)).toHaveLength(0);
   });
 });
 
@@ -201,7 +270,7 @@ describe("replaceEpisodes and getSeasonEpisodes", () => {
 
   it("stores episodes in episode-number order", async () => {
     const id = await seedTitle();
-    await upsertSeasons(db, id, [SEASON_ONE]);
+    await saveSeasons(db, id, [SEASON_ONE]);
     await replaceEpisodes(
       db,
       id,
@@ -223,7 +292,7 @@ describe("replaceEpisodes and getSeasonEpisodes", () => {
   // drop it here too, rather than leaving a phantom row no refetch removes.
   it("replaces the previous episode set rather than accumulating", async () => {
     const id = await seedTitle();
-    await upsertSeasons(db, id, [SEASON_ONE]);
+    await saveSeasons(db, id, [SEASON_ONE]);
     const now = new Date();
 
     await replaceEpisodes(
@@ -250,7 +319,7 @@ describe("replaceEpisodes and getSeasonEpisodes", () => {
 
   it("stamps the season's fetchedAt so freshness can be judged", async () => {
     const id = await seedTitle();
-    await upsertSeasons(db, id, [SEASON_ONE]);
+    await saveSeasons(db, id, [SEASON_ONE]);
 
     const before = await getSeasonEpisodes(db, id, 1);
     expect(before?.fetchedAt).toBeNull();
@@ -263,7 +332,7 @@ describe("replaceEpisodes and getSeasonEpisodes", () => {
 
   it("returns the season alongside its episodes", async () => {
     const id = await seedTitle();
-    await upsertSeasons(db, id, [SEASON_ONE]);
+    await saveSeasons(db, id, [SEASON_ONE]);
     await replaceEpisodes(db, id, 1, [], new Date());
 
     const result = await getSeasonEpisodes(db, id, 1);
