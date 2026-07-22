@@ -5,6 +5,11 @@ import {
   useSaveMetadataConfig,
   useTestMetadataKey,
 } from "../metadata";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 const TMDB_ATTRIBUTION =
   "This product uses the TMDB API but is not endorsed or certified by TMDB.";
@@ -42,17 +47,17 @@ export function AdminMetadata(): JSX.Element {
   return (
     <main className="min-h-screen p-8">
       <div className="mx-auto w-full max-w-2xl">
-        <h1 className="font-display text-2xl text-accent-500">Metadata</h1>
+        <h1 className="font-display text-2xl text-foreground">Metadata</h1>
 
-        <section className="mt-6 rounded-card bg-harbor-900 p-8">
+        <Card className="mt-6 p-8">
           <h2 className="font-display text-lg">Provider status</h2>
 
           {config.isPending ? <p className="mt-4">Loading…</p> : null}
 
           {config.isError ? (
-            <p role="alert" aria-live="assertive" className="mt-4 text-sm text-red-400">
-              {describeMetadataError(config.error)}
-            </p>
+            <Alert variant="destructive" aria-live="assertive" className="mt-4">
+              <AlertDescription>{describeMetadataError(config.error)}</AlertDescription>
+            </Alert>
           ) : null}
 
           {config.data && !config.data.configured ? (
@@ -64,15 +69,15 @@ export function AdminMetadata(): JSX.Element {
 
           {config.data?.configured ? (
             <dl className="mt-4 text-sm">
-              <div className="flex justify-between rounded bg-harbor-950 p-2">
+              <div className="flex justify-between rounded-lg bg-background p-2">
                 <dt>Provider</dt>
                 <dd>TMDB {config.data.enabled ? "(enabled)" : "(disabled)"}</dd>
               </div>
-              <div className="mt-2 flex justify-between rounded bg-harbor-950 p-2">
+              <div className="mt-2 flex justify-between rounded-lg bg-background p-2">
                 <dt>Metadata language</dt>
                 <dd>{config.data.language}</dd>
               </div>
-              <div className="mt-2 flex justify-between rounded bg-harbor-950 p-2">
+              <div className="mt-2 flex justify-between rounded-lg bg-background p-2">
                 <dt>Last verified</dt>
                 <dd>
                   {config.data.lastVerifiedAt === null
@@ -82,79 +87,80 @@ export function AdminMetadata(): JSX.Element {
               </div>
             </dl>
           ) : null}
-        </section>
+        </Card>
 
-        <section className="mt-6 rounded-card bg-harbor-900 p-8">
+        <Card className="mt-6 p-8">
           <h2 className="font-display text-lg">
             {config.data?.configured ? "Replace the API key" : "Add a TMDB API key"}
           </h2>
 
           <form className="mt-4" onSubmit={onSave}>
-            <label className="block text-sm" htmlFor="apiKey">
+            <Label className="block" htmlFor="apiKey">
               TMDB API Read Access Token
-            </label>
-            <input
+            </Label>
+            <Input
               id="apiKey"
               type="password"
               autoComplete="off"
               spellCheck={false}
-              className="mt-1 w-full rounded bg-harbor-950 p-2 focus:outline-none focus:ring-2 focus:ring-accent-500"
+              className="mt-1"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
             />
 
-            <label className="mt-4 block text-sm" htmlFor="language">
+            <Label className="mt-4 block" htmlFor="language">
               Metadata language
-            </label>
-            <input
+            </Label>
+            <Input
               id="language"
-              className="mt-1 w-full rounded bg-harbor-950 p-2 focus:outline-none focus:ring-2 focus:ring-accent-500"
+              className="mt-1"
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
               placeholder="en-US"
             />
 
             <div className="mt-6 flex gap-2">
-              <button
+              <Button
                 type="button"
-                className="flex-1 rounded bg-harbor-800 p-2 font-medium disabled:opacity-50"
+                variant="secondary"
+                className="flex-1"
                 disabled={keyMissing || testKey.isPending}
                 onClick={onTest}
               >
                 {testKey.isPending ? "Testing…" : "Test connection"}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
-                className="flex-1 rounded bg-accent-500 p-2 font-medium disabled:opacity-50"
+                className="flex-1"
                 disabled={keyMissing || saveConfig.isPending}
               >
                 {saveConfig.isPending ? "Saving…" : "Save"}
-              </button>
+              </Button>
             </div>
           </form>
 
           {testKey.isSuccess ? (
-            <p role="status" aria-live="polite" className="mt-4 text-sm text-green-400">
+            <p role="status" aria-live="polite" className="mt-4 text-sm text-success">
               TMDB accepted this key. It has not been saved yet.
             </p>
           ) : null}
 
           {testKey.isError ? (
-            <p role="alert" aria-live="assertive" className="mt-4 text-sm text-red-400">
-              {describeMetadataError(testKey.error)}
-            </p>
+            <Alert variant="destructive" aria-live="assertive" className="mt-4">
+              <AlertDescription>{describeMetadataError(testKey.error)}</AlertDescription>
+            </Alert>
           ) : null}
 
           {saveConfig.isSuccess ? (
-            <p role="status" aria-live="polite" className="mt-4 text-sm text-green-400">
+            <p role="status" aria-live="polite" className="mt-4 text-sm text-success">
               Saved. Harbor will use this key for metadata searches.
             </p>
           ) : null}
 
           {saveConfig.isError ? (
-            <p role="alert" aria-live="assertive" className="mt-4 text-sm text-red-400">
-              {describeMetadataError(saveConfig.error)}
-            </p>
+            <Alert variant="destructive" aria-live="assertive" className="mt-4">
+              <AlertDescription>{describeMetadataError(saveConfig.error)}</AlertDescription>
+            </Alert>
           ) : null}
 
           <p className="mt-6 text-xs opacity-70">
@@ -162,7 +168,7 @@ export function AdminMetadata(): JSX.Element {
             Changing <code>HARBOR_SECRET</code> makes the stored key unreadable, and it must then
             be entered again.
           </p>
-        </section>
+        </Card>
 
         <p className="mt-6 text-xs opacity-70">{TMDB_ATTRIBUTION}</p>
       </div>

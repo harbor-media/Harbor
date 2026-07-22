@@ -1,6 +1,12 @@
 import { roleRank, type RegistrationMode, type UserRole } from "@harbor/shared";
 import { type FormEvent, type JSX, useState } from "react";
 import { useCurrentUser } from "../auth";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import {
   useCreateInvitation,
   useInvitations,
@@ -10,6 +16,19 @@ import {
 } from "../invitations";
 
 const GRANTABLE: UserRole[] = ["administrator", "user", "guest"];
+
+/**
+ * Styling for the two native <select> elements, matched to the Input
+ * primitive so they read as one family.
+ *
+ * They stay native deliberately. The end-to-end suite drives them with
+ * selectOption() and reads their choices via .locator("option") -- both
+ * native-select APIs. Radix Select renders a listbox of divs with no
+ * <option> elements, so swapping it in would break four tests, including
+ * the one asserting an administrator cannot grant the administrator role.
+ */
+const SELECT_CLASS =
+  "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
 
 export function Invitations(): JSX.Element {
   const currentUser = useCurrentUser();
@@ -60,17 +79,17 @@ export function Invitations(): JSX.Element {
   return (
     <main className="min-h-screen p-8">
       <div className="mx-auto w-full max-w-2xl">
-        <h1 className="font-display text-2xl text-accent-500">Invitations</h1>
+        <h1 className="font-display text-2xl text-foreground">Invitations</h1>
 
-        <section className="mt-6 rounded-card bg-harbor-900 p-8">
+        <Card className="mt-6 p-8">
           <h2 className="font-display text-lg">Create an invitation</h2>
           <form className="mt-4" onSubmit={onCreate}>
-            <label className="block text-sm" htmlFor="role">
+            <Label className="block" htmlFor="role">
               Role
-            </label>
+            </Label>
             <select
               id="role"
-              className="mt-1 w-full rounded bg-harbor-950 p-2 focus:outline-none focus:ring-2 focus:ring-accent-500"
+              className={cn(SELECT_CLASS, "mt-1")}
               value={role}
               onChange={(e) => setRole(e.target.value as UserRole)}
             >
@@ -81,48 +100,48 @@ export function Invitations(): JSX.Element {
               ))}
             </select>
 
-            <label className="mt-4 block text-sm" htmlFor="email">
+            <Label className="mt-4 block" htmlFor="email">
               Email (optional)
-            </label>
-            <input
+            </Label>
+            <Input
               id="email"
               type="email"
-              className="mt-1 w-full rounded bg-harbor-950 p-2 focus:outline-none focus:ring-2 focus:ring-accent-500"
+              className="mt-1"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
 
-            <label className="mt-4 block text-sm" htmlFor="maxUses">
+            <Label className="mt-4 block" htmlFor="maxUses">
               Max uses
-            </label>
-            <input
+            </Label>
+            <Input
               id="maxUses"
               type="number"
               min={1}
-              className="mt-1 w-full rounded bg-harbor-950 p-2 focus:outline-none focus:ring-2 focus:ring-accent-500"
+              className="mt-1"
               value={maxUses}
               onChange={(e) => setMaxUses(e.target.value)}
             />
 
-            <label className="mt-4 block text-sm" htmlFor="expiresInDays">
+            <Label className="mt-4 block" htmlFor="expiresInDays">
               Expires in days (optional)
-            </label>
-            <input
+            </Label>
+            <Input
               id="expiresInDays"
               type="number"
               min={1}
-              className="mt-1 w-full rounded bg-harbor-950 p-2 focus:outline-none focus:ring-2 focus:ring-accent-500"
+              className="mt-1"
               value={expiresInDays}
               onChange={(e) => setExpiresInDays(e.target.value)}
             />
 
-            <button
+            <Button
               type="submit"
-              className="mt-6 w-full rounded bg-accent-500 p-2 font-medium disabled:opacity-50"
+              className="mt-6 w-full"
               disabled={createInvitation.isPending || grantable.length === 0}
             >
               {createInvitation.isPending ? "Creating…" : "Create invitation"}
-            </button>
+            </Button>
           </form>
 
           {grantable.length === 0 ? (
@@ -132,43 +151,44 @@ export function Invitations(): JSX.Element {
           ) : null}
 
           {createInvitation.isError ? (
-            <p role="alert" aria-live="assertive" className="mt-4 text-sm text-red-400">
-              {createInvitation.error.message}
-            </p>
+            <Alert variant="destructive" aria-live="assertive" className="mt-4">
+              <AlertDescription>{createInvitation.error.message}</AlertDescription>
+            </Alert>
           ) : null}
 
           {inviteUrl !== null ? (
             <div className="mt-4">
-              <label className="block text-sm" htmlFor="inviteUrl">
+              <Label className="block" htmlFor="inviteUrl">
                 Invite link (shown once — copy it now)
-              </label>
-              <input
+              </Label>
+              <Input
                 id="inviteUrl"
                 readOnly
-                className="mt-1 w-full rounded bg-harbor-950 p-2 focus:outline-none focus:ring-2 focus:ring-accent-500"
+                className="mt-1"
                 value={inviteUrl}
               />
-              <button
+              <Button
                 type="button"
-                className="mt-2 w-full rounded bg-harbor-800 p-2 font-medium"
+                variant="secondary"
+                className="mt-2 w-full"
                 onClick={() => {
                   void navigator.clipboard.writeText(inviteUrl).then(() => setCopied(true));
                 }}
               >
                 {copied ? "Copied" : "Copy"}
-              </button>
+              </Button>
             </div>
           ) : null}
-        </section>
+        </Card>
 
-        <section className="mt-6 rounded-card bg-harbor-900 p-8">
+        <Card className="mt-6 p-8">
           <h2 className="font-display text-lg">Registration mode</h2>
-          <label className="mt-4 block text-sm" htmlFor="registrationMode">
+          <Label className="mt-4 block" htmlFor="registrationMode">
             Mode
-          </label>
+          </Label>
           <select
             id="registrationMode"
-            className="mt-1 w-full rounded bg-harbor-950 p-2 focus:outline-none focus:ring-2 focus:ring-accent-500"
+            className={cn(SELECT_CLASS, "mt-1")}
             value={registrationMode.data ?? "invitation-only"}
             onChange={(e) => onModeSelect(e.target.value as RegistrationMode)}
           >
@@ -178,49 +198,50 @@ export function Invitations(): JSX.Element {
           </select>
 
           {pendingOpenMode ? (
-            <div className="mt-2 rounded bg-harbor-950 p-3">
-              <p role="alert" aria-live="assertive" className="text-sm text-red-400">
-                Open registration lets anyone create an account without an invitation.
-              </p>
+            <div className="mt-2 rounded-lg bg-background p-3">
+              <Alert variant="destructive" aria-live="assertive">
+              <AlertDescription>Open registration lets anyone create an account without an invitation.</AlertDescription>
+            </Alert>
               <div className="mt-2 flex gap-2">
-                <button
+                <Button
                   type="button"
-                  className="rounded bg-accent-500 px-3 py-1 font-medium"
+                  size="sm"
                   onClick={onConfirmOpenMode}
                 >
                   Confirm open registration
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
-                  className="rounded bg-harbor-800 px-3 py-1 font-medium"
+                  size="sm"
+                  variant="secondary"
                   onClick={() => setPendingOpenMode(false)}
                 >
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           ) : null}
 
           {!pendingOpenMode && registrationMode.data === "open" ? (
-            <p role="status" className="mt-2 text-sm text-red-400">
+            <p role="status" className="mt-2 text-sm text-destructive">
               Anyone can create an account without an invitation.
             </p>
           ) : null}
 
           {setRegistrationMode.isError ? (
-            <p role="alert" aria-live="assertive" className="mt-2 text-sm text-red-400">
-              {setRegistrationMode.error.message}
-            </p>
+            <Alert variant="destructive" aria-live="assertive" className="mt-2">
+              <AlertDescription>{setRegistrationMode.error.message}</AlertDescription>
+            </Alert>
           ) : null}
-        </section>
+        </Card>
 
-        <section className="mt-6 rounded-card bg-harbor-900 p-8">
+        <Card className="mt-6 p-8">
           <h2 className="font-display text-lg">Existing invitations</h2>
           {invitations.isPending ? <p className="mt-4">Loading…</p> : null}
           {invitations.isError ? (
-            <p role="alert" aria-live="assertive" className="mt-4 text-sm text-red-400">
-              {invitations.error.message}
-            </p>
+            <Alert variant="destructive" aria-live="assertive" className="mt-4">
+              <AlertDescription>{invitations.error.message}</AlertDescription>
+            </Alert>
           ) : null}
           {invitations.data?.length === 0 ? (
             <p className="mt-4 text-sm">No invitations yet.</p>
@@ -229,31 +250,32 @@ export function Invitations(): JSX.Element {
             {(invitations.data ?? []).map((invite) => (
               <li
                 key={invite.id}
-                className="mt-2 flex items-center justify-between rounded bg-harbor-950 p-2"
+                className="mt-2 flex items-center justify-between rounded-lg bg-background p-2"
               >
                 <span className="text-sm">
                   {invite.role} · {invite.status} · {invite.uses}/{invite.maxUses}
                   {invite.emailBound ? " · email-bound" : ""}
                 </span>
                 {invite.status === "active" ? (
-                  <button
+                  <Button
                     type="button"
-                    className="rounded bg-harbor-800 px-3 py-1 font-medium disabled:opacity-50"
+                    size="sm"
+                    variant="secondary"
                     disabled={revokeInvitation.isPending}
                     onClick={() => revokeInvitation.mutate(invite.id)}
                   >
                     Revoke
-                  </button>
+                  </Button>
                 ) : null}
               </li>
             ))}
           </ul>
           {revokeInvitation.isError ? (
-            <p role="alert" aria-live="assertive" className="mt-4 text-sm text-red-400">
-              {revokeInvitation.error.message}
-            </p>
+            <Alert variant="destructive" aria-live="assertive" className="mt-4">
+              <AlertDescription>{revokeInvitation.error.message}</AlertDescription>
+            </Alert>
           ) : null}
-        </section>
+        </Card>
       </div>
     </main>
   );
