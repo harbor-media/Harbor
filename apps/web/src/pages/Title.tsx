@@ -4,7 +4,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ApiError, describeMetadataError } from "../metadata";
 import { EpisodeList } from "../components/EpisodeList";
 import { SeasonSelector } from "../components/SeasonSelector";
-import { TitleBackdrop, TitleInfo, TitleInfoSkeleton } from "../components/TitleHero";
+import { TitleBackdrop, TitleHeader, TitleHeaderSkeleton } from "../components/TitleHero";
 import { useSeasonDetail, useTitleDetail } from "../titles";
 
 const TMDB_ATTRIBUTION =
@@ -38,16 +38,21 @@ export function Title(): JSX.Element {
   const isSeries = detail.data?.type === "series";
   const season = useSeasonDetail(id, isSeries ? active : null);
 
+  const activeSeason = seasons.find((s) => s.seasonNumber === active);
+  const seasonLabel = isSeries
+    ? (activeSeason?.name ?? (active === null ? null : `Season ${String(active)}`))
+    : null;
+
   const notConfigured =
     detail.error instanceof ApiError && detail.error.code === "METADATA_NOT_CONFIGURED";
 
   return (
-    <main className="relative min-h-screen p-8">
+    <main className="relative min-h-screen px-8 pb-16">
       {detail.data ? <TitleBackdrop detail={detail.data} /> : null}
 
-      <div className="mx-auto w-full max-w-6xl">
+      <div className="mx-auto w-full max-w-7xl">
         {detail.isError ? (
-          <Alert variant="destructive" aria-live="assertive">
+          <Alert variant="destructive" aria-live="assertive" className="mt-8">
             <AlertDescription>
               {describeMetadataError(detail.error)}
               {notConfigured ? (
@@ -63,37 +68,32 @@ export function Title(): JSX.Element {
           </Alert>
         ) : null}
 
-        {/* Information left, episodes right -- the episode panel is a fixed
-            column on wide screens and stacks beneath on narrow ones, so a
-            phone reads title first and episodes after. */}
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_400px]">
-          <div>
-            {detail.isPending ? <TitleInfoSkeleton /> : null}
-            {detail.data ? <TitleInfo detail={detail.data} /> : null}
-          </div>
+        {detail.isPending ? <TitleHeaderSkeleton /> : null}
+        {detail.data ? <TitleHeader detail={detail.data} seasonLabel={seasonLabel} /> : null}
 
-          {detail.data && isSeries && seasons.length > 0 ? (
-            <aside className="self-start rounded-xl border border-border bg-card/80 backdrop-blur">
-              <SeasonSelector titleId={detail.data.id} seasons={seasons} active={active} />
+        {detail.data && isSeries && seasons.length > 0 ? (
+          <section className="mt-12">
+            <SeasonSelector titleId={detail.data.id} seasons={seasons} active={active} />
 
+            <div className="mt-6">
               {season.isError ? (
-                <Alert variant="destructive" aria-live="assertive" className="m-3">
+                <Alert variant="destructive" aria-live="assertive">
                   <AlertDescription>{describeMetadataError(season.error)}</AlertDescription>
                 </Alert>
               ) : null}
 
               {season.isPending && active !== null ? (
-                <p className="p-3 text-sm text-muted-foreground" role="status">
+                <p className="text-sm text-muted-foreground" role="status">
                   Loading episodes…
                 </p>
               ) : null}
 
               {season.data ? <EpisodeList episodes={season.data.episodes} /> : null}
-            </aside>
-          ) : null}
-        </div>
+            </div>
+          </section>
+        ) : null}
 
-        <p className="mt-12 text-xs opacity-70">{TMDB_ATTRIBUTION}</p>
+        <p className="mt-16 text-xs opacity-70">{TMDB_ATTRIBUTION}</p>
       </div>
     </main>
   );
