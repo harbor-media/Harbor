@@ -8,6 +8,12 @@
 @import "@fontsource-variable/geist-mono";
 @import "@fontsource-variable/outfit";
 
+/* shadcn's base-ui utilities: animate-in/out helpers, data-state variants
+   (data-open/data-closed/etc.), and the accordion/scroll-fade/shimmer
+   keyframes several primitives rely on. */
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
