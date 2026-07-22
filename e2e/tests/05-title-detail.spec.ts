@@ -74,6 +74,25 @@ test("a series page shows season tabs and switching changes the episodes", async
   await expect(page.getByText("Pilot")).toHaveCount(0);
 });
 
+test("episode stills actually render", async ({ page }) => {
+  await signIn(page);
+  await search(page, "Supernatural");
+  await page.getByRole("link", { name: /supernatural/i }).first().click();
+
+  const still = page.getByRole("img", { name: "Pilot" });
+  await expect(still).toBeVisible();
+
+  // naturalWidth, not visibility. A broken image is still "visible" to
+  // Playwright, because it renders its alt text -- which is exactly how a
+  // still requested at a size the image proxy's allowlist does not permit
+  // looked on the page: a caption with an empty box under it.
+  await expect
+    .poll(async () =>
+      still.evaluate((img) => (img as unknown as { naturalWidth: number }).naturalWidth),
+    )
+    .toBeGreaterThan(0);
+});
+
 test("a second visit is served from Harbor's cache", async ({ page }) => {
   await signIn(page);
   await search(page, "Blade Runner");
