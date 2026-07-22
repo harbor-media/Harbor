@@ -65,8 +65,11 @@ function send(res, status, body) {
 }
 
 // Detail payloads. Supernatural (1622) is the series used for season
-// navigation; it deliberately has two seasons with different episode names so
-// a tab switch is observable rather than merely rendering something.
+// navigation. Seasons 1 and 2 carry distinct episode names so a season switch
+// is observable rather than merely rendering something; the remaining 22 plus
+// Specials exist so the season picker is a genuinely long list. A short list
+// would let an unbounded popover pass -- it only overflows the viewport once
+// there are more options than fit on screen.
 const MOVIE_DETAIL = {
   id: 78,
   title: "Blade Runner",
@@ -90,8 +93,15 @@ const SERIES_DETAIL = {
   episode_run_time: [44],
   genres: [{ id: 18, name: "Drama" }],
   seasons: [
-    { season_number: 1, name: "Season 1", overview: "", poster_path: "/s1.jpg", episode_count: 2, air_date: "2005-09-13" },
-    { season_number: 2, name: "Season 2", overview: "", poster_path: "/s2.jpg", episode_count: 2, air_date: "2006-09-28" },
+    { season_number: 0, name: "Specials", overview: "", poster_path: null, episode_count: 1, air_date: null },
+    ...Array.from({ length: 24 }, (_, i) => ({
+      season_number: i + 1,
+      name: `Season ${String(i + 1)}`,
+      overview: "",
+      poster_path: "/s1.jpg",
+      episode_count: 2,
+      air_date: "2005-09-13",
+    })),
   ],
 };
 

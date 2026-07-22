@@ -1,3 +1,8 @@
+// The package depends on @harbor/server and @harbor/web purely so turbo's
+// `dependsOn: ["^build"]` actually has something to build. Without those
+// entries the suite runs against whatever happens to be sitting in dist,
+// which means it can pass against source that no longer exists -- it did,
+// silently, until a UI fix kept "failing" with a byte-identical result.
 // Orchestrates the e2e suite so `pnpm test:e2e` is fully self-contained:
 // start a disposable PostgreSQL container on its own port, run Playwright
 // against it, then tear the container down.

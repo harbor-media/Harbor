@@ -9,6 +9,8 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@harbor/server": "workspace:*",
+    "@harbor/web": "workspace:*",
     "@playwright/test": "1.61.1",
     "@types/node": "24.13.3",
     "typescript": "6.0.3"

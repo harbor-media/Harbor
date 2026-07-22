@@ -134,3 +134,31 @@ test("title detail requires authentication", async ({ browser }) => {
   expect(response.status()).toBe(401);
   await anonymous.close();
 });
+
+test("the season picker stays within the viewport on a long-running series", async ({
+  page,
+}) => {
+  await signIn(page);
+  await search(page, "Supernatural");
+  await page.getByRole("link", { name: /supernatural/i }).first().click();
+  await expect(page.getByRole("navigation", { name: "Seasons" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Season" }).click();
+
+  const listbox = page.getByRole("listbox");
+  await expect(listbox).toBeVisible();
+  // All 25 seasons are present -- the popover scrolls rather than dropping
+  // any, so the cap below is about size, not about hiding options.
+  await expect(listbox.getByRole("option")).toHaveCount(25);
+
+  const box = await listbox.boundingBox();
+  const viewport = page.viewportSize();
+  if (box === null || viewport === null) throw new Error("no layout box");
+
+  // The bug: an uncapped popover grew to the full height available to it, so
+  // choosing a season meant a list that covered the page. Asserting only that
+  // it fits the viewport would not catch that -- React Aria already guarantees
+  // that much -- so the height itself is what is pinned.
+  expect(box.height).toBeLessThanOrEqual(340);
+  expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+});

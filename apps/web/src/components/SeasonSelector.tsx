@@ -3,8 +3,9 @@ import type { JSX } from "react";
 import { useNavigate } from "react-router";
 import {
   Select,
-  SelectContent,
   SelectItem,
+  SelectList,
+  SelectPopover,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -44,13 +45,24 @@ export function SeasonSelector({
         <SelectTrigger className="w-56">
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
-          {seasons.map((season) => (
-            <SelectItem key={season.seasonNumber} id={String(season.seasonNumber)}>
-              {label(season)}
-            </SelectItem>
-          ))}
-        </SelectContent>
+        {/* Composed from the popover and list rather than SelectContent so
+            the list itself can be capped. The list is the scroll container,
+            and React Aria sizes the popover to the space available -- so on a
+            tall screen an uncapped 25-season list simply claims the whole
+            viewport. Capping the popover instead does not work: React Aria
+            writes its own max-height inline, which beats any class. */}
+        <SelectPopover>
+          <SelectList className="max-h-80">
+            {seasons.map((season) => (
+              <SelectItem
+                key={season.seasonNumber}
+                id={String(season.seasonNumber)}
+              >
+                {label(season)}
+              </SelectItem>
+            ))}
+          </SelectList>
+        </SelectPopover>
       </Select>
     </nav>
   );
