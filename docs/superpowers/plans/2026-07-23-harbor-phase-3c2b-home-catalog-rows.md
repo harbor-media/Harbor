@@ -728,7 +728,82 @@ describe("fetchCatalogRow", () => {
 });
 ```
 
-Write `fakeCatalogProvider`, `emptyCatalogProvider` and `failingCatalog` as local helpers returning a full `MetadataProvider`; `fakeCatalogProvider` returns two `NormalizedTitle`s and increments `calls.catalog`.
+The helpers, in full:
+
+```ts
+interface Calls {
+  catalog: number;
+}
+
+function card(id: number, title: string): NormalizedTitle {
+  return {
+    type: "movie",
+    title,
+    originalTitle: null,
+    year: 1982,
+    overview: null,
+    posterPath: "/p.jpg",
+    backdropPath: null,
+    externalIds: [{ source: "tmdb", externalId: String(id) }],
+  };
+}
+
+const ALL_KINDS = ["trending", "popular-movies", "popular-series", "new-releases"] as const;
+
+/** Every member the interface requires; individual tests override getCatalog. */
+function baseProvider(): MetadataProvider {
+  return {
+    id: "tmdb",
+    catalogs: ALL_KINDS,
+    validateConfiguration: () => Promise.resolve(),
+    search: () => Promise.resolve([]),
+    getMovie: () => Promise.reject(new Error("unused")),
+    getSeries: () => Promise.reject(new Error("unused")),
+    getSeason: () => Promise.resolve([]),
+    getCatalog: () => Promise.resolve([]),
+  };
+}
+
+function fakeCatalogProvider(calls: Calls): MetadataProvider {
+  return {
+    ...baseProvider(),
+    getCatalog: () => {
+      calls.catalog += 1;
+      return Promise.resolve([card(78, "Blade Runner"), card(1622, "Supernatural")]);
+    },
+  };
+}
+
+function emptyCatalogProvider(calls: Calls): MetadataProvider {
+  return {
+    ...baseProvider(),
+    getCatalog: () => {
+      calls.catalog += 1;
+      return Promise.resolve([]);
+    },
+  };
+}
+
+function failingCatalog(kind: "unavailable" | "unauthorized"): MetadataProvider {
+  return {
+    ...baseProvider(),
+    getCatalog: () => Promise.reject(new MetadataProviderError(kind, "failed")),
+  };
+}
+
+function deps(provider: MetadataProvider, now?: () => Date): CatalogDeps {
+  return {
+    db,
+    harborSecret: HARBOR_SECRET,
+    providerFactory: () => provider,
+    ...(now ? { now } : {}),
+  };
+}
+```
+
+`db`, `HARBOR_SECRET` and `configure()` come from the container harness — copy
+those verbatim from `detail.test.ts`, which already stores an encrypted TMDB
+key against a running PostgreSQL container.
 
 - [ ] **Step 2: Run to verify they fail**
 
@@ -1670,6 +1745,18 @@ test("the shell reaches search and marks unbuilt destinations", async ({ page })
 
   await page.getByRole("link", { name: /^search$/i }).click();
   await expect(page).toHaveURL(/\/search$/);
+});
+
+test("row scroll buttons reflect position", async ({ page }) => {
+  await signIn(page);
+
+  const trending = page.getByRole("region", { name: "Trending" });
+  const left = trending.getByRole("button", { name: /scroll trending left/i });
+
+  // At rest the row is at its start, so "left" has nowhere to go. Without
+  // this the enable/disable logic is untested anywhere -- jsdom does not
+  // implement scroll geometry, so a unit test cannot cover it either.
+  await expect(left).toBeDisabled();
 });
 
 test("catalog rows require authentication", async ({ browser }) => {
