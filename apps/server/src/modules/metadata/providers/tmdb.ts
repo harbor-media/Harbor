@@ -1,8 +1,9 @@
-import type { NormalizedTitle } from "@harbor/database";
+import type { NormalizedEpisode, NormalizedTitle } from "@harbor/database";
 import {
   MetadataProviderError,
   type MetadataProvider,
   type MetadataSearchQuery,
+  type ProviderTitleDetail,
 } from "./types.js";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
@@ -45,6 +46,70 @@ function normalize(item: TmdbSearchItem): NormalizedTitle | null {
     posterPath: item.poster_path ?? null,
     backdropPath: item.backdrop_path ?? null,
     externalIds: [{ source: "tmdb", externalId: String(item.id) }],
+  };
+}
+
+interface TmdbGenre {
+  id: number;
+  name: string;
+}
+
+interface TmdbSeasonSummary {
+  season_number: number;
+  name?: string;
+  overview?: string;
+  poster_path?: string | null;
+  episode_count?: number;
+  air_date?: string | null;
+}
+
+interface TmdbEpisode {
+  episode_number: number;
+  name?: string;
+  overview?: string;
+  still_path?: string | null;
+  runtime?: number | null;
+  air_date?: string | null;
+}
+
+/**
+ * Providers use "" for an unknown value as often as null. Storing the empty
+ * string would make an absent overview render as a blank block instead of
+ * being skipped, and an absent air date sort as though it were a real value.
+ */
+function textOrNull(value: string | null | undefined): string | null {
+  return value === undefined || value === null || value === "" ? null : value;
+}
+
+function toDetail(payload: Record<string, unknown>, isMovie: boolean): ProviderTitleDetail {
+  const genres = (payload["genres"] as TmdbGenre[] | undefined) ?? [];
+  const runTimes = (payload["episode_run_time"] as number[] | undefined) ?? [];
+  const seasonList = (payload["seasons"] as TmdbSeasonSummary[] | undefined) ?? [];
+
+  return {
+    originalTitle: textOrNull(
+      (isMovie ? payload["original_title"] : payload["original_name"]) as string | undefined,
+    ),
+    year: yearOf(
+      (isMovie ? payload["release_date"] : payload["first_air_date"]) as string | undefined,
+    ),
+    overview: textOrNull(payload["overview"] as string | undefined),
+    posterPath: textOrNull(payload["poster_path"] as string | null | undefined),
+    backdropPath: textOrNull(payload["backdrop_path"] as string | null | undefined),
+    // A movie carries a single runtime; a series carries a list of typical
+    // episode lengths, whose first entry is the representative one.
+    runtime: isMovie ? ((payload["runtime"] as number | undefined) ?? null) : (runTimes[0] ?? null),
+    genres: genres.map((g) => g.name),
+    seasons: isMovie
+      ? []
+      : seasonList.map((sn) => ({
+          seasonNumber: sn.season_number,
+          name: textOrNull(sn.name),
+          overview: textOrNull(sn.overview),
+          posterPath: textOrNull(sn.poster_path),
+          episodeCount: sn.episode_count ?? null,
+          airDate: textOrNull(sn.air_date),
+        })),
   };
 }
 
@@ -113,6 +178,54 @@ export function createTmdbProvider(
         const normalized = normalize(item);
         return normalized ? [normalized] : [];
       });
+    },
+
+    async getMovie(
+      externalId: string,
+      language: string,
+      signal: AbortSignal,
+    ): Promise<ProviderTitleDetail> {
+      const payload = (await call(
+        `/movie/${externalId}`,
+        new URLSearchParams({ language }),
+        signal,
+      )) as Record<string, unknown>;
+      return toDetail(payload, true);
+    },
+
+    async getSeries(
+      externalId: string,
+      language: string,
+      signal: AbortSignal,
+    ): Promise<ProviderTitleDetail> {
+      const payload = (await call(
+        `/tv/${externalId}`,
+        new URLSearchParams({ language }),
+        signal,
+      )) as Record<string, unknown>;
+      return toDetail(payload, false);
+    },
+
+    async getSeason(
+      externalId: string,
+      seasonNumber: number,
+      language: string,
+      signal: AbortSignal,
+    ): Promise<NormalizedEpisode[]> {
+      const payload = (await call(
+        `/tv/${externalId}/season/${String(seasonNumber)}`,
+        new URLSearchParams({ language }),
+        signal,
+      )) as { episodes?: TmdbEpisode[] };
+
+      return (payload.episodes ?? []).map((e) => ({
+        episodeNumber: e.episode_number,
+        name: textOrNull(e.name),
+        overview: textOrNull(e.overview),
+        stillPath: textOrNull(e.still_path),
+        runtime: e.runtime ?? null,
+        airDate: textOrNull(e.air_date),
+      }));
     },
   };
 }

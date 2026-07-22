@@ -1,0 +1,166 @@
+import { describe, expect, it, vi } from "vitest";
+import { createTmdbProvider } from "./tmdb.js";
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+function fake(impl: () => Promise<Response>): typeof fetch {
+  return vi.fn(impl) as unknown as typeof fetch;
+}
+
+const SIGNAL = (): AbortSignal => AbortSignal.timeout(5000);
+
+const MOVIE = {
+  id: 78,
+  title: "Blade Runner",
+  original_title: "Blade Runner",
+  release_date: "1982-06-25",
+  overview: "A blade runner must pursue replicants.",
+  poster_path: "/poster.jpg",
+  backdrop_path: "/backdrop.jpg",
+  runtime: 117,
+  genres: [
+    { id: 878, name: "Science Fiction" },
+    { id: 53, name: "Thriller" },
+  ],
+};
+
+const SERIES = {
+  id: 1622,
+  name: "Supernatural",
+  original_name: "Supernatural",
+  first_air_date: "2005-09-13",
+  overview: "Two brothers hunt monsters.",
+  poster_path: "/sn.jpg",
+  backdrop_path: null,
+  episode_run_time: [44],
+  genres: [{ id: 18, name: "Drama" }],
+  seasons: [
+    { season_number: 0, name: "Specials", overview: "", poster_path: null, episode_count: 5, air_date: null },
+    { season_number: 1, name: "Season 1", overview: "", poster_path: "/s1.jpg", episode_count: 22, air_date: "2005-09-13" },
+  ],
+};
+
+const SEASON = {
+  season_number: 1,
+  episodes: [
+    { episode_number: 1, name: "Pilot", overview: "Sam and Dean.", still_path: "/e1.jpg", runtime: 48, air_date: "2005-09-13" },
+    { episode_number: 2, name: "Wendigo", overview: "", still_path: null, runtime: 42, air_date: "2005-09-20" },
+  ],
+};
+
+describe("getMovie", () => {
+  it("normalizes a movie payload", async () => {
+    const provider = createTmdbProvider("key", { fetchImpl: fake(async () => json(MOVIE)) });
+    const detail = await provider.getMovie("78", "en-US", SIGNAL());
+
+    expect(detail.runtime).toBe(117);
+    expect(detail.year).toBe(1982);
+    expect(detail.genres).toEqual(["Science Fiction", "Thriller"]);
+    expect(detail.backdropPath).toBe("/backdrop.jpg");
+    expect(detail.overview).toBe("A blade runner must pursue replicants.");
+    // A movie has no seasons; the field exists so callers need no type test.
+    expect(detail.seasons).toEqual([]);
+  });
+
+  it("requests the movie path for the given id", async () => {
+    const fetchImpl = vi.fn(async () => json(MOVIE));
+    const provider = createTmdbProvider("key", { fetchImpl: fetchImpl as unknown as typeof fetch });
+    await provider.getMovie("78", "en-US", SIGNAL());
+    expect(String(fetchImpl.mock.calls[0]?.[0])).toContain("/movie/78");
+  });
+
+  it("maps a failure status to a provider error", async () => {
+    const provider = createTmdbProvider("key", { fetchImpl: fake(async () => json({}, 404)) });
+    await expect(provider.getMovie("0", "en-US", SIGNAL())).rejects.toMatchObject({
+      kind: "unavailable",
+    });
+  });
+});
+
+describe("getSeries", () => {
+  it("normalizes a series payload including its seasons", async () => {
+    const provider = createTmdbProvider("key", { fetchImpl: fake(async () => json(SERIES)) });
+    const detail = await provider.getSeries("1622", "en-US", SIGNAL());
+
+    expect(detail.year).toBe(2005);
+    expect(detail.genres).toEqual(["Drama"]);
+    // episode_run_time is an array; the first entry is representative.
+    expect(detail.runtime).toBe(44);
+    expect(detail.seasons.map((s) => s.seasonNumber)).toEqual([0, 1]);
+    expect(detail.seasons[1]?.episodeCount).toBe(22);
+    expect(detail.seasons[1]?.posterPath).toBe("/s1.jpg");
+  });
+
+  it("tolerates an empty episode_run_time", async () => {
+    const provider = createTmdbProvider("key", {
+      fetchImpl: fake(async () => json({ ...SERIES, episode_run_time: [] })),
+    });
+    const detail = await provider.getSeries("1622", "en-US", SIGNAL());
+    expect(detail.runtime).toBeNull();
+  });
+
+  // Providers use "" for an unknown value as often as null. Storing "" would
+  // make an empty overview render as a blank block rather than be skipped.
+  it("converts empty strings to null", async () => {
+    const provider = createTmdbProvider("key", { fetchImpl: fake(async () => json(SERIES)) });
+    const detail = await provider.getSeries("1622", "en-US", SIGNAL());
+
+    expect(detail.backdropPath).toBeNull();
+    expect(detail.seasons[0]?.overview).toBeNull();
+    expect(detail.seasons[0]?.airDate).toBeNull();
+  });
+
+  it("requests the tv path for the given id", async () => {
+    const fetchImpl = vi.fn(async () => json(SERIES));
+    const provider = createTmdbProvider("key", { fetchImpl: fetchImpl as unknown as typeof fetch });
+    await provider.getSeries("1622", "en-US", SIGNAL());
+    expect(String(fetchImpl.mock.calls[0]?.[0])).toContain("/tv/1622");
+  });
+});
+
+describe("getSeason", () => {
+  it("normalizes episodes", async () => {
+    const provider = createTmdbProvider("key", { fetchImpl: fake(async () => json(SEASON)) });
+    const eps = await provider.getSeason("1622", 1, "en-US", SIGNAL());
+
+    expect(eps).toHaveLength(2);
+    expect(eps[0]).toEqual({
+      episodeNumber: 1,
+      name: "Pilot",
+      overview: "Sam and Dean.",
+      stillPath: "/e1.jpg",
+      runtime: 48,
+      airDate: "2005-09-13",
+    });
+    expect(eps[1]?.overview).toBeNull();
+    expect(eps[1]?.stillPath).toBeNull();
+  });
+
+  it("requests the season path for the given number", async () => {
+    const fetchImpl = vi.fn(async () => json(SEASON));
+    const provider = createTmdbProvider("key", { fetchImpl: fetchImpl as unknown as typeof fetch });
+    await provider.getSeason("1622", 3, "en-US", SIGNAL());
+    expect(String(fetchImpl.mock.calls[0]?.[0])).toContain("/tv/1622/season/3");
+  });
+
+  it("returns an empty list when the payload has no episodes", async () => {
+    const provider = createTmdbProvider("key", { fetchImpl: fake(async () => json({})) });
+    expect(await provider.getSeason("1622", 1, "en-US", SIGNAL())).toEqual([]);
+  });
+
+  // The credential travels in the Authorization header. A query string lands
+  // in proxy logs, browser history, and Referer headers.
+  it("never puts the api key in the url", async () => {
+    const fetchImpl = vi.fn(async () => json(SEASON));
+    const provider = createTmdbProvider("super-secret-key", {
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+    await provider.getSeason("1622", 1, "en-US", SIGNAL());
+    expect(String(fetchImpl.mock.calls[0]?.[0])).not.toContain("super-secret-key");
+  });
+});
