@@ -275,3 +275,37 @@ export interface SeasonResponse {
   episodes: EpisodeItem[];
   cached: boolean;
 }
+
+/**
+ * The catalog rows Harbor knows how to render. Exported as a const tuple so
+ * the web client can iterate every kind without asking the server which are
+ * available first -- a capability round-trip would put a waterfall in front
+ * of the home screen's four parallel row requests.
+ */
+export const CATALOG_KINDS = [
+  "trending",
+  "popular-movies",
+  "popular-series",
+  "new-releases",
+] as const;
+
+export type CatalogKind = (typeof CATALOG_KINDS)[number];
+
+/**
+ * The minimum a poster card needs. Deliberately not TitleDetailResponse: a
+ * row is twenty of these, and twenty overviews is payload nobody renders.
+ */
+export interface TitleCard {
+  id: string;
+  type: "movie" | "series";
+  title: string;
+  year: number | null;
+  posterPath: string | null;
+}
+
+export interface CatalogRowResponse {
+  kind: CatalogKind;
+  titles: TitleCard[];
+  /** True when served without contacting the provider. */
+  cached: boolean;
+}
