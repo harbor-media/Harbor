@@ -256,3 +256,34 @@ export const episodes = pgTable(
   },
   (t) => [uniqueIndex("episodes_season_number_idx").on(t.seasonId, t.episodeNumber)],
 );
+
+/**
+ * Freshness lives on its own row, separate from membership.
+ *
+ * Stamped on the entries instead, a kind the provider returns EMPTY would
+ * store no rows, therefore hold no timestamp, therefore look permanently
+ * stale -- refetching on every request forever, for the one case guaranteed
+ * to keep returning nothing.
+ */
+export const catalogRows = pgTable("catalog_rows", {
+  kind: text("kind").primaryKey(),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(),
+});
+
+export const catalogEntries = pgTable(
+  "catalog_entries",
+  {
+    kind: text("kind")
+      .notNull()
+      .references(() => catalogRows.kind, { onDelete: "cascade" }),
+    // Providers return RANKED order, and that ranking is the entire
+    // information content of a "Popular" row. A SELECT without an explicit
+    // ORDER BY on this column is unordered in PostgreSQL no matter what
+    // order the rows were inserted in.
+    position: integer("position").notNull(),
+    titleId: uuid("title_id")
+      .notNull()
+      .references(() => titles.id, { onDelete: "cascade" }),
+  },
+  (table) => [primaryKey({ columns: [table.kind, table.position] })],
+);

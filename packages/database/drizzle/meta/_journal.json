@@ -50,6 +50,13 @@
       "when": 1784726423950,
       "tag": "0006_sleepy_juggernaut",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1784760020894,
+      "tag": "0007_clever_gateway",
+      "breakpoints": true
     }
   ]
 }
