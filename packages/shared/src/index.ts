@@ -230,3 +230,48 @@ export interface SearchResponse {
    *  Exposed so the cache is observable in the UI and assertable in tests. */
   cached: boolean;
 }
+
+export interface SeasonSummary {
+  seasonNumber: number;
+  name: string | null;
+  episodeCount: number | null;
+  posterPath: string | null;
+  airDate: string | null;
+}
+
+export interface EpisodeItem {
+  episodeNumber: number;
+  name: string | null;
+  overview: string | null;
+  stillPath: string | null;
+  runtime: number | null;
+  airDate: string | null;
+}
+
+export interface TitleDetailResponse {
+  id: string;
+  type: "movie" | "series";
+  title: string;
+  originalTitle: string | null;
+  year: number | null;
+  overview: string | null;
+  posterPath: string | null;
+  backdropPath: string | null;
+  runtime: number | null;
+  genres: string[];
+  /**
+   * Empty for movies. Season summaries only -- episodes come from the season
+   * endpoint, so drawing a tab strip does not fetch an entire show.
+   */
+  seasons: SeasonSummary[];
+  /** True when served without contacting the provider. */
+  cached: boolean;
+}
+
+export interface SeasonResponse {
+  seasonNumber: number;
+  name: string | null;
+  overview: string | null;
+  episodes: EpisodeItem[];
+  cached: boolean;
+}
