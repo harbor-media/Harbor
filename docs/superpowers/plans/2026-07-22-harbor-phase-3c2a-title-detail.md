@@ -1449,7 +1449,18 @@ Do not proceed to the final review until the user confirms.
 - [ ] Search results link to `/movie/:id` or `/series/:id` by type
 - [ ] A title page renders artwork, overview, genres, runtime, and year
 - [ ] A missing backdrop falls back to the blurred poster, not a flat bar
-- [ ] Series show season tabs; each tab is a link to `/series/:id/season/:n`
+- [x] Series show a season picker that navigates to `/series/:id/season/:n`
+
+  **Amended during implementation, at the user's direction.** Planned as a
+  tab strip with one `<a>` per season. A tab strip cannot hold a 25-season
+  show: scrolling it needs `overflow-x`, which Windows draws as a persistent
+  bar and which per CSS also forces `overflow-y` to `auto`, and wrapping it
+  turns the strip into a wall. It is a React Aria `Select` instead.
+
+  The cost is real and worth stating: seasons are no longer anchors, so
+  middle-click, ctrl-click, "copy link address", and link-hover previews are
+  gone. Each season still has its own URL and the back button still works, so
+  nothing is unreachable — but the affordances of a link are.
 - [ ] Episodes load one season at a time, never all seasons at once
 - [ ] A second visit is served from cache, proven by asserting no provider call
 - [ ] Detail refetches after 24 hours
