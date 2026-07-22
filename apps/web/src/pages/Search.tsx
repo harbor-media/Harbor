@@ -122,17 +122,24 @@ export function Search(): JSX.Element {
 
             <ul className="mt-4">
               {results.data.results.map((item) => (
-                <li key={item.id} className="mt-2 flex gap-3 rounded-xl bg-card p-3">
-                  <Poster path={item.posterPath} title={item.title} />
-                  <div className="min-w-0">
-                    <p className="text-sm text-foreground">
-                      {item.title}
-                      {item.year === null ? "" : ` (${String(item.year)})`} · {item.type}
-                    </p>
-                    {item.overview === null ? null : (
-                      <p className="mt-1 text-xs text-muted-foreground">{item.overview}</p>
-                    )}
-                  </div>
+                <li key={item.id} className="mt-2">
+                  {/* The whole row is the target: a small text-only link is a
+                      poor hit area, and the poster is what people aim at. */}
+                  <Link
+                    to={`/${item.type === "movie" ? "movie" : "series"}/${item.id}`}
+                    className="flex gap-3 rounded-xl bg-card p-3 transition-colors hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+                  >
+                    <Poster path={item.posterPath} title={item.title} />
+                    <div className="min-w-0">
+                      <p className="text-sm text-foreground">
+                        {item.title}
+                        {item.year === null ? "" : ` (${String(item.year)})`} · {item.type}
+                      </p>
+                      {item.overview === null ? null : (
+                        <p className="mt-1 text-xs text-muted-foreground">{item.overview}</p>
+                      )}
+                    </div>
+                  </Link>
                 </li>
               ))}
             </ul>
