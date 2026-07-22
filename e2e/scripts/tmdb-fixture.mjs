@@ -37,6 +37,18 @@ const SEARCH_RESULTS = {
       poster_path: "/2049.jpg",
       backdrop_path: null,
     },
+    {
+      // The series used for season navigation. Its detail payload lives in
+      // SERIES_DETAIL below, keyed by this same id.
+      id: 1622,
+      media_type: "tv",
+      name: "Supernatural",
+      original_name: "Supernatural",
+      first_air_date: "2005-09-13",
+      overview: "Two brothers hunt monsters.",
+      poster_path: "/sn.jpg",
+      backdrop_path: null,
+    },
     // A person result, included on purpose: Harbor must drop it rather than
     // list an actor as a watchable title.
     { id: 999, media_type: "person", name: "Ridley Scott" },
@@ -52,12 +64,70 @@ function send(res, status, body) {
   res.end(payload);
 }
 
+// Detail payloads. Supernatural (1622) is the series used for season
+// navigation; it deliberately has two seasons with different episode names so
+// a tab switch is observable rather than merely rendering something.
+const MOVIE_DETAIL = {
+  id: 78,
+  title: "Blade Runner",
+  original_title: "Blade Runner",
+  release_date: "1982-06-25",
+  overview: "A blade runner must pursue replicants.",
+  poster_path: "/poster.jpg",
+  backdrop_path: "/backdrop.jpg",
+  runtime: 117,
+  genres: [{ id: 878, name: "Science Fiction" }, { id: 53, name: "Thriller" }],
+};
+
+const SERIES_DETAIL = {
+  id: 1622,
+  name: "Supernatural",
+  original_name: "Supernatural",
+  first_air_date: "2005-09-13",
+  overview: "Two brothers hunt monsters.",
+  poster_path: "/sn.jpg",
+  backdrop_path: null,
+  episode_run_time: [44],
+  genres: [{ id: 18, name: "Drama" }],
+  seasons: [
+    { season_number: 1, name: "Season 1", overview: "", poster_path: "/s1.jpg", episode_count: 2, air_date: "2005-09-13" },
+    { season_number: 2, name: "Season 2", overview: "", poster_path: "/s2.jpg", episode_count: 2, air_date: "2006-09-28" },
+  ],
+};
+
+const SEASON_EPISODES = {
+  1: [
+    { episode_number: 1, name: "Pilot", overview: "Sam and Dean.", still_path: "/e1.jpg", runtime: 48, air_date: "2005-09-13" },
+    { episode_number: 2, name: "Wendigo", overview: "", still_path: null, runtime: 42, air_date: "2005-09-20" },
+  ],
+  2: [
+    { episode_number: 1, name: "In My Time of Dying", overview: "", still_path: null, runtime: 42, air_date: "2006-09-28" },
+    { episode_number: 2, name: "Everybody Loves a Clown", overview: "", still_path: null, runtime: 42, air_date: "2006-10-05" },
+  ],
+};
+
+/** Counts detail fetches so a spec can prove Harbor served from its own
+ *  cache rather than re-fetching. Without it the cached assertion would only
+ *  be checking that data came back, which passes either way. */
+let detailFetches = 0;
+
 const server = createServer((req, res) => {
   const url = new URL(req.url ?? "/", `http://localhost:${String(PORT)}`);
 
   // Harbor must send the credential as a bearer token, never in the query
   // string. Reading it from the header here means a regression that moved it
   // into the URL would fail the suite rather than pass silently.
+  if (url.pathname === "/count") {
+    send(res, 200, { detailFetches });
+    return;
+  }
+
+  if (url.pathname === "/reset") {
+    detailFetches = 0;
+    send(res, 200, { detailFetches });
+    return;
+  }
+
   const auth = req.headers.authorization ?? "";
   if (auth !== `Bearer ${VALID_KEY}`) {
     send(res, 401, { status_message: "Invalid API key" });
@@ -71,6 +141,25 @@ const server = createServer((req, res) => {
 
   if (url.pathname === "/search/multi") {
     send(res, 200, SEARCH_RESULTS);
+    return;
+  }
+
+  if (url.pathname === "/movie/78") {
+    detailFetches += 1;
+    send(res, 200, MOVIE_DETAIL);
+    return;
+  }
+
+  if (url.pathname === "/tv/1622") {
+    detailFetches += 1;
+    send(res, 200, SERIES_DETAIL);
+    return;
+  }
+
+  const season = /^\/tv\/1622\/season\/(\d+)$/.exec(url.pathname);
+  if (season) {
+    detailFetches += 1;
+    send(res, 200, { season_number: Number(season[1]), episodes: SEASON_EPISODES[season[1]] ?? [] });
     return;
   }
 

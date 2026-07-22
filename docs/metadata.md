@@ -52,6 +52,11 @@ silently reporting "not configured", so the cause is visible in the logs.
 
 Take a backup before rotating `HARBOR_SECRET`.
 
+## Title pages
+
+Search results link to movie and series pages backed by their own detail
+endpoints and a 24-hour cache. See [catalog.md](catalog.md).
+
 ## Images
 
 Poster and backdrop artwork is served through Harbor's own image proxy rather
