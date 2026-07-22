@@ -38,11 +38,11 @@ function Still({ path, label }: { path: string | null; label: string }): JSX.Ele
 
 export function EpisodeList({ episodes }: { episodes: EpisodeItem[] }): JSX.Element {
   if (episodes.length === 0) {
-    return <p className="mt-4 text-sm text-muted-foreground">No episodes listed for this season.</p>;
+    return <p className="p-3 text-sm text-muted-foreground">No episodes listed for this season.</p>;
   }
 
   return (
-    <ul className="mt-4">
+    <ul>
       {episodes.map((episode) => {
         const label = episode.name ?? `Episode ${String(episode.episodeNumber)}`;
         const runtime = episode.runtime === null ? null : `${String(episode.runtime)} min`;
@@ -51,21 +51,18 @@ export function EpisodeList({ episodes }: { episodes: EpisodeItem[] }): JSX.Elem
         return (
           <li
             key={episode.episodeNumber}
-            className="flex gap-3 border-b border-border py-3 last:border-b-0"
+            className="flex gap-3 border-b border-border px-3 py-3 last:border-b-0"
           >
-            <span className="w-8 shrink-0 pt-1 font-mono text-xs tracking-widest text-muted-foreground">
-              {String(episode.episodeNumber).padStart(2, "0")}
-            </span>
-
             <Still path={episode.stillPath} label={label} />
 
             <div className="min-w-0">
-              <p className="text-sm">{label}</p>
+              {/* Number and name on one line, as a viewer reads them aloud:
+                  "episode three, Chitty Chitty Death Bang". */}
+              <p className="text-sm">
+                {episode.episodeNumber}. {label}
+              </p>
               {meta === "" ? null : (
                 <p className="mt-0.5 font-mono text-xs text-muted-foreground">{meta}</p>
-              )}
-              {episode.overview === null ? null : (
-                <p className="mt-1 text-xs text-muted-foreground">{episode.overview}</p>
               )}
             </div>
           </li>

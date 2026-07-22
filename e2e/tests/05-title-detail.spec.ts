@@ -64,7 +64,9 @@ test("a series page shows season tabs and switching changes the episodes", async
   await expect(page.getByRole("navigation", { name: "Seasons" })).toBeVisible();
   await expect(page.getByText("Pilot")).toBeVisible();
 
-  await page.getByRole("link", { name: "Season 2" }).click();
+  // A native select, driven the way the invitations dropdowns already are.
+  // Tabs were replaced because a twenty-season show cannot wear a tab strip.
+  await page.getByLabel("Season", { exact: true }).selectOption("2");
 
   await expect(page).toHaveURL(/\/series\/[0-9a-f-]{36}\/season\/2$/);
   await expect(page.getByText("In My Time of Dying")).toBeVisible();
