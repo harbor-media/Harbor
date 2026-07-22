@@ -1,4 +1,5 @@
 import type { NormalizedEpisode, NormalizedSeason, NormalizedTitle } from "@harbor/database";
+import type { CatalogKind } from "@harbor/shared";
 
 export type MetadataFailureKind = "unauthorized" | "unavailable";
 
@@ -53,4 +54,18 @@ export interface MetadataProvider {
     language: string,
     signal: AbortSignal,
   ): Promise<NormalizedEpisode[]>;
+  /**
+   * The catalog kinds this provider can actually serve.
+   *
+   * A capability list rather than four methods, because the rule above still
+   * holds: a method that throws NotImplemented makes the contract a lie. A
+   * provider that cannot serve New Releases omits the kind and Harbor hides
+   * that row instead of rendering an error.
+   */
+  readonly catalogs: readonly CatalogKind[];
+  getCatalog(
+    kind: CatalogKind,
+    language: string,
+    signal: AbortSignal,
+  ): Promise<NormalizedTitle[]>;
 }

@@ -1,4 +1,5 @@
 import type { NormalizedEpisode, NormalizedTitle } from "@harbor/database";
+import type { CatalogKind } from "@harbor/shared";
 import { z } from "zod";
 import {
   MetadataProviderError,
@@ -175,6 +176,21 @@ function toDetail(
   };
 }
 
+/**
+ * `/movie/*` and `/tv/*` return no `media_type`, but multi-search does and
+ * `normalize()` requires it. The adapter supplies it for the single-type
+ * endpoints and trusts it on `/trending/all/week`, which genuinely mixes
+ * movies, series and people.
+ */
+const CATALOG_ENDPOINTS: Record<CatalogKind, { path: string; mediaType?: "movie" | "tv" }> = {
+  trending: { path: "/trending/all/week" },
+  "popular-movies": { path: "/movie/popular", mediaType: "movie" },
+  "popular-series": { path: "/tv/popular", mediaType: "tv" },
+  "new-releases": { path: "/movie/now_playing", mediaType: "movie" },
+};
+
+const CATALOG_KINDS_SUPPORTED = Object.keys(CATALOG_ENDPOINTS) as CatalogKind[];
+
 export interface TmdbProviderOptions {
   baseUrl?: string;
   fetchImpl?: typeof fetch;
@@ -238,6 +254,31 @@ export function createTmdbProvider(
 
   return {
     id: "tmdb",
+
+    catalogs: CATALOG_KINDS_SUPPORTED,
+
+    async getCatalog(
+      kind: CatalogKind,
+      language: string,
+      signal: AbortSignal,
+    ): Promise<NormalizedTitle[]> {
+      const endpoint = CATALOG_ENDPOINTS[kind];
+      const payload = parseOrUnavailable(
+        searchResponseSchema,
+        await call(endpoint.path, new URLSearchParams({ language }), signal),
+      );
+
+      return (payload.results ?? []).flatMap((raw) => {
+        const item = searchItemSchema.safeParse(raw);
+        if (!item.success) return [];
+        const withType =
+          endpoint.mediaType === undefined
+            ? item.data
+            : { ...item.data, media_type: endpoint.mediaType };
+        const normalized = normalize(withType);
+        return normalized ? [normalized] : [];
+      });
+    },
 
     async validateConfiguration(signal: AbortSignal): Promise<void> {
       await call("/authentication", new URLSearchParams(), signal);

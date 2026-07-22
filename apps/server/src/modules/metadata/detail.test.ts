@@ -117,6 +117,8 @@ function fakeProvider(calls: Calls): MetadataProvider {
       calls.season += 1;
       return EPISODES;
     },
+    catalogs: ["trending", "popular-movies", "popular-series", "new-releases"],
+    getCatalog: async () => [],
   };
 }
 
@@ -131,6 +133,8 @@ function failing(kind: "unavailable" | "unauthorized"): MetadataProvider {
     getMovie: async () => boom(),
     getSeries: async () => boom(),
     getSeason: async () => boom(),
+    catalogs: ["trending", "popular-movies", "popular-series", "new-releases"],
+    getCatalog: async () => boom(),
   };
 }
 
