@@ -8,9 +8,13 @@
 @import "@fontsource-variable/geist-mono";
 @import "@fontsource-variable/outfit";
 
-/* shadcn's base-ui utilities: animate-in/out helpers, data-state variants
-   (data-open/data-closed/etc.), and the accordion/scroll-fade/shimmer
-   keyframes several primitives rely on. */
+/* Animation utilities the shadcn primitives rely on: animate-in/out helpers,
+   data-state variants (data-open/data-closed/etc.), and the
+   accordion/scroll-fade/shimmer keyframes. Contains no color tokens, so it
+   cannot shadow the achromatic theme below.
+
+   Harbor is on shadcn's Radix build (`-b radix`), not the newer base-ui
+   default, matching the Radix primitives CLAUDE.md already specifies. */
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
