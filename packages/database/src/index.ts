@@ -1,4 +1,5 @@
 export * from "./client.js";
+export * from "./detail.js";
 export * from "./installation.js";
 export * from "./invitations.js";
 export * from "./metadata.js";
