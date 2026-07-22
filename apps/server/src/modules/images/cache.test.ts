@@ -88,11 +88,24 @@ describe("writeAtomic", () => {
     // A temp file on another filesystem makes rename non-atomic and, on most
     // platforms, fail outright with EXDEV.
     const target = path.join(root, "tmdb", "w342", "abc.jpg");
+    const directory = path.join(root, "tmdb", "w342");
     let sawTemp: string[] = [];
 
     async function* observing(): AsyncIterable<Uint8Array> {
       yield new TextEncoder().encode("a");
-      sawTemp = await readdir(path.join(root, "tmdb", "w342"));
+
+      // Poll rather than read once. createWriteStream opens the file lazily
+      // and flushes asynchronously, so a single readdir immediately after the
+      // first chunk races file creation -- which passed in isolation and
+      // failed intermittently under full-suite load. Awaiting here does not
+      // block the write; it only delays the next chunk.
+      const deadline = Date.now() + 5000;
+      for (;;) {
+        sawTemp = (await readdir(directory)).filter((n) => n.endsWith(".tmp"));
+        if (sawTemp.length > 0 || Date.now() > deadline) break;
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+
       yield new TextEncoder().encode("b");
     }
 
