@@ -164,6 +164,14 @@ export const titles = pgTable(
     overview: text("overview"),
     posterPath: text("poster_path"),
     backdropPath: text("backdrop_path"),
+    runtime: integer("runtime"),
+    genres: jsonb("genres").$type<string[]>().notNull().default([]),
+    // Distinct from fetchedAt on purpose. A row created by search holds only
+    // summary fields; without this there is no way to tell "Harbor knows this
+    // title exists" from "Harbor has the whole title", and the detail page
+    // would either refetch on every visit or render half-empty from search
+    // data.
+    detailFetchedAt: timestamp("detail_fetched_at", { withTimezone: true, mode: "date" }),
     fetchedAt: timestamp("fetched_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   },
   (t) => [index("titles_title_idx").on(t.title)],
@@ -210,3 +218,41 @@ export type Title = typeof titles.$inferSelect;
 export type NewTitle = typeof titles.$inferInsert;
 export type TitleExternalIdRow = typeof titleExternalIds.$inferSelect;
 export type MetadataSearchCache = typeof metadataSearchCache.$inferSelect;
+
+export const seasons = pgTable(
+  "seasons",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    titleId: uuid("title_id")
+      .notNull()
+      .references(() => titles.id, { onDelete: "cascade" }),
+    seasonNumber: integer("season_number").notNull(),
+    name: text("name"),
+    overview: text("overview"),
+    posterPath: text("poster_path"),
+    episodeCount: integer("episode_count"),
+    // Stored as text, not date: provider payloads carry "" for an unknown
+    // air date as often as null, and a text column keeps that faithfully
+    // instead of failing the insert.
+    airDate: text("air_date"),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true, mode: "date" }),
+  },
+  (t) => [uniqueIndex("seasons_title_number_idx").on(t.titleId, t.seasonNumber)],
+);
+
+export const episodes = pgTable(
+  "episodes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    seasonId: uuid("season_id")
+      .notNull()
+      .references(() => seasons.id, { onDelete: "cascade" }),
+    episodeNumber: integer("episode_number").notNull(),
+    name: text("name"),
+    overview: text("overview"),
+    stillPath: text("still_path"),
+    runtime: integer("runtime"),
+    airDate: text("air_date"),
+  },
+  (t) => [uniqueIndex("episodes_season_number_idx").on(t.seasonId, t.episodeNumber)],
+);
