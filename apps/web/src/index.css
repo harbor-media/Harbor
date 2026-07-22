@@ -60,6 +60,20 @@
   --radius-2xl: calc(var(--radius) * 1.8);
 }
 
+/*
+ * Tells the browser to render its own chrome dark: native <select> popups,
+ * autofill backgrounds, scrollbars, and date pickers.
+ *
+ * Without this the two native selects on the invitations page become
+ * unreadable. Their options inherit the near-white foreground while the UA
+ * paints the popup light, giving white text on white. Nothing catches it:
+ * Playwright's selectOption() sets the value without ever opening the popup,
+ * and a person only sees it after clicking a dropdown.
+ */
+:root {
+  color-scheme: dark;
+}
+
 body {
   background-color: var(--color-background);
   color: var(--color-foreground);
