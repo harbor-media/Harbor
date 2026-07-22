@@ -103,7 +103,10 @@ export async function createApp(deps: AppDeps): Promise<HarborApp> {
   // by the time this body executes, while still calling `addHook` before
   // authGuard's own registration.
   const defaultRateLimitPlugin: FastifyPluginAsync = async (fastify) => {
-    const defaultRateLimit = fastify.rateLimit({ max: 100, timeWindow: "1 minute" });
+    const defaultRateLimit = fastify.rateLimit({
+      max: deps.env.HARBOR_RATE_LIMIT_MAX,
+      timeWindow: "1 minute",
+    });
     fastify.addHook("onRequest", async (request, reply) => {
       const routeUrl = request.routeOptions.url;
       if (routeUrl === undefined || !routeUrl.startsWith(API_PREFIX)) return;

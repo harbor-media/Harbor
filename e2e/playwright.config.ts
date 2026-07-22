@@ -88,6 +88,11 @@ export default defineConfig({
       HARBOR_SECRET: "e2e-secret-0123456789abcdef0123456789",
       HARBOR_DATA_DIRECTORY: "./.e2e-data",
       HARBOR_LOG_LEVEL: "warn",
+      // The suite fires far more requests per minute from one IP than any
+      // human, so the production default of 100/min would 429 later specs and
+      // strand them on /login. Raised well past the suite's peak; login keeps
+      // its own separate limit, which the suite stays under.
+      HARBOR_RATE_LIMIT_MAX: "100000",
       DATABASE_URL: databaseUrl,
       HARBOR_TMDB_BASE_URL: TMDB_FIXTURE_URL,
       HARBOR_TMDB_IMAGE_BASE_URL: IMAGE_FIXTURE_URL,

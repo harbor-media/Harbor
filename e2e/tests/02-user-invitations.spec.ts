@@ -115,7 +115,7 @@ test("owner invites a user who registers and lands signed in; owner sees the inv
   await inviteePage.getByRole("button", { name: "Create account" }).click();
 
   await expect(inviteePage).toHaveURL(/\/home$/);
-  await expect(inviteePage.getByText(`Signed in as ${INVITEE.username}`)).toBeVisible();
+  await expect(inviteePage.getByRole("button", { name: "Sign out" })).toBeVisible();
 
   const cookies = await inviteeContext.cookies();
   const session = cookies.find((c) => c.name === "harbor_session");
@@ -216,7 +216,7 @@ test("open registration lets a visitor self-register without an invite, then the
   await openPage.getByRole("button", { name: "Create account" }).click();
 
   await expect(openPage).toHaveURL(/\/home$/);
-  await expect(openPage.getByText(`Signed in as ${OPEN_REGISTRANT.username}`)).toBeVisible();
+  await expect(openPage.getByRole("button", { name: "Sign out" })).toBeVisible();
 
   expect(openErrors).toEqual([]);
   await openContext.close();

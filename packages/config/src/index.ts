@@ -11,6 +11,13 @@ const EnvSchema = z.object({
   HARBOR_LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
   HARBOR_TRUST_PROXY: z.stringbool().default(false),
   HARBOR_VERSION: z.string().default("0.1.0-dev"),
+  // The per-IP ceiling on general API requests per minute. CLAUDE.md requires
+  // rate limits to be configurable without recompilation: an operator behind
+  // CGNAT, where many households share one address, needs to raise it, and the
+  // end-to-end suite -- which bursts far past any human pace from a single IP
+  // -- sets it high so its own traffic is not throttled. Login keeps its own
+  // tighter, separate limit.
+  HARBOR_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(100),
   // Maximum bytes the image cache may occupy before the sweep evicts.
   HARBOR_CACHE_MAX_SIZE: z.coerce.number().int().min(0).default(2_147_483_648),
   // Overrides the image CDN base URL. This is a SEPARATE host from

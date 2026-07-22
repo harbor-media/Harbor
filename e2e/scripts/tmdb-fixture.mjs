@@ -116,6 +116,32 @@ const SEASON_EPISODES = {
   ],
 };
 
+const CATALOG = {
+  "/trending/all/week": [
+    {
+      id: 1622,
+      media_type: "tv",
+      name: "Supernatural",
+      poster_path: "/sn.jpg",
+      first_air_date: "2005-09-13",
+    },
+    {
+      id: 78,
+      media_type: "movie",
+      title: "Blade Runner",
+      poster_path: "/poster.jpg",
+      release_date: "1982-06-25",
+    },
+  ],
+  "/movie/popular": [
+    { id: 78, title: "Blade Runner", poster_path: "/poster.jpg", release_date: "1982-06-25" },
+  ],
+  "/tv/popular": [
+    { id: 1622, name: "Supernatural", poster_path: "/sn.jpg", first_air_date: "2005-09-13" },
+  ],
+  "/movie/now_playing": [],
+};
+
 /** Counts detail fetches so a spec can prove Harbor served from its own
  *  cache rather than re-fetching. Without it the cached assertion would only
  *  be checking that data came back, which passes either way. */
@@ -170,6 +196,16 @@ const server = createServer((req, res) => {
   if (season) {
     detailFetches += 1;
     send(res, 200, { season_number: Number(season[1]), episodes: SEASON_EPISODES[season[1]] ?? [] });
+    return;
+  }
+
+  // Catalog rows. /movie/* and /tv/* deliberately omit media_type, exactly as
+  // TMDB does -- the adapter has to supply it, and a fixture that helpfully
+  // included it would hide that bug. /movie/now_playing returns an empty list
+  // on purpose, exercising both the empty-row-is-hidden rule and the
+  // empty-row-freshness case.
+  if (CATALOG[url.pathname]) {
+    send(res, 200, { results: CATALOG[url.pathname] });
     return;
   }
 

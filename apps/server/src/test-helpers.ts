@@ -16,6 +16,7 @@ export const testEnv: HarborEnv = {
   HARBOR_TRUST_PROXY: false,
   HARBOR_VERSION: "0.1.0-test",
   HARBOR_CACHE_MAX_SIZE: 2_147_483_648,
+  HARBOR_RATE_LIMIT_MAX: 100,
 };
 
 export interface FakeSqlHandle {

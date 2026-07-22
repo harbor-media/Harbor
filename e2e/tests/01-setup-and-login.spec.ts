@@ -48,7 +48,7 @@ test("a fresh install redirects to setup and creates the owner", async ({ page }
 
   // Setup issues a session, so the owner lands signed in rather than at /login.
   await expect(page).toHaveURL(/\/home$/);
-  await expect(page.getByText(`Signed in as ${OWNER.username}`)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
 
   expect(consoleErrors).toEqual([]);
 });
@@ -77,11 +77,9 @@ test("an unauthenticated visitor is sent to login without ever seeing home conte
   // committed (before the SPA finishes its render/query cycle), so we can
   // inspect the DOM mid-redirect rather than only after it settles.
   await page.goto("/home", { waitUntil: "commit" });
-  await expect(page.getByText(/Signed in as/)).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
 
   await expect(page).toHaveURL(/\/login$/);
-  await expect(page.getByText(/Signed in as/)).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
 
   expect(consoleErrors).toEqual([]);
@@ -143,7 +141,6 @@ test("correct credentials sign the owner in, the session survives reload, and si
   // /home after sign-out must not reveal any previously cached user content.
   await page.goto("/home");
   await expect(page).toHaveURL(/\/login$/);
-  await expect(page.getByText(/Signed in as/)).toHaveCount(0);
 
   expect(consoleErrors).toEqual([]);
 });

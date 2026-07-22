@@ -15,6 +15,12 @@ describe("loadEnv", () => {
     expect(env.HARBOR_LOG_LEVEL).toBe("info");
     expect(env.HARBOR_TRUST_PROXY).toBe(false);
     expect(env.NODE_ENV).toBe("development");
+    expect(env.HARBOR_RATE_LIMIT_MAX).toBe(100);
+  });
+
+  it("coerces a configured rate-limit ceiling to a number", () => {
+    const env = loadEnv({ ...valid, HARBOR_RATE_LIMIT_MAX: "5000" } as NodeJS.ProcessEnv);
+    expect(env.HARBOR_RATE_LIMIT_MAX).toBe(5000);
   });
 
   it("coerces the port to a number", () => {
