@@ -3,6 +3,7 @@ import type { JSX } from "react";
 import { createBrowserRouter, Navigate, Outlet, useLocation } from "react-router";
 import { useInstallationState } from "./api";
 import { useCurrentUser } from "./auth";
+import { AppShell } from "./components/AppShell";
 import { AdminMetadata } from "./pages/AdminMetadata";
 import { Home } from "./pages/Home";
 import { Invite } from "./pages/Invite";
@@ -73,13 +74,21 @@ export const router = createBrowserRouter([
       { path: "login", Component: Login },
       { path: "invite/:token", Component: Invite },
       { path: "register", Component: Register },
-      { path: "home", Component: Home },
-      { path: "search", Component: Search },
-      { path: "movie/:id", Component: Title },
-      { path: "series/:id", Component: Title },
-      { path: "series/:id/season/:season", Component: Title },
-      { path: "admin/invitations", Component: Invitations },
-      { path: "admin/metadata", Component: AdminMetadata },
+      // The signed-in pages share the app shell (persistent header). Setup,
+      // login, invite and register stay outside it — they render before there
+      // is a user to build a header for.
+      {
+        Component: AppShell,
+        children: [
+          { path: "home", Component: Home },
+          { path: "search", Component: Search },
+          { path: "movie/:id", Component: Title },
+          { path: "series/:id", Component: Title },
+          { path: "series/:id/season/:season", Component: Title },
+          { path: "admin/invitations", Component: Invitations },
+          { path: "admin/metadata", Component: AdminMetadata },
+        ],
+      },
     ],
   },
 ]);
