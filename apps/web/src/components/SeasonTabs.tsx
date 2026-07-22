@@ -22,8 +22,13 @@ export function SeasonTabs({
   return (
     <nav aria-label="Seasons" className="border-b border-border">
       {/* Scrolls rather than wraps: a twenty-season show must not push the
-          episode list off the screen. */}
-      <ul className="flex gap-1 overflow-x-auto">
+          episode list off the screen.
+
+          overflow-y-hidden is required, not decorative. Per CSS, when
+          overflow-x is anything but visible, overflow-y computes from visible
+          to auto -- so overflow-x-auto alone renders a vertical scrollbar
+          inside the tab strip. */}
+      <ul className="flex gap-1 overflow-x-auto overflow-y-hidden">
         {seasons.map((season) => {
           const current = season.seasonNumber === active;
           return (

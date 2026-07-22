@@ -128,13 +128,30 @@ describe("upsertSeasons and listSeasons", () => {
   it("returns seasons in season-number order", async () => {
     const id = await seedTitle();
     await upsertSeasons(db, id, [
+      { ...SEASON_ONE, seasonNumber: 3, name: "Season 3" },
       { ...SEASON_ONE, seasonNumber: 2, name: "Season 2" },
-      { ...SEASON_ONE, seasonNumber: 0, name: "Specials" },
       SEASON_ONE,
     ]);
 
     const rows = await listSeasons(db, id);
-    expect(rows.map((s) => s.seasonNumber)).toEqual([0, 1, 2]);
+    expect(rows.map((s) => s.seasonNumber)).toEqual([1, 2, 3]);
+  });
+
+  // Providers number specials 0. A naive ascending sort would put them first,
+  // so the tab strip would open a show on its specials rather than its first
+  // episode -- and the default season, which is simply the first in this
+  // list, would be wrong too.
+  it("sorts the specials season last, not first", async () => {
+    const id = await seedTitle();
+    await upsertSeasons(db, id, [
+      { ...SEASON_ONE, seasonNumber: 0, name: "Specials" },
+      { ...SEASON_ONE, seasonNumber: 2, name: "Season 2" },
+      SEASON_ONE,
+    ]);
+
+    const rows = await listSeasons(db, id);
+    expect(rows.map((s) => s.seasonNumber)).toEqual([1, 2, 0]);
+    expect(rows.at(-1)?.name).toBe("Specials");
   });
 
   it("updates an existing season rather than duplicating it", async () => {

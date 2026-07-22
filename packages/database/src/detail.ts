@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import type { Db } from "./client.js";
 import { episodes, seasons, titleExternalIds, titles } from "./schema.js";
 import type { StoredTitle, TitleExternalId } from "./titles.js";
@@ -127,9 +127,13 @@ export async function listSeasons(db: Db, titleId: string): Promise<NormalizedSe
     .select()
     .from(seasons)
     .where(eq(seasons.titleId, titleId))
-    // Ordered by number: a tab strip must read 1, 2, 3 regardless of the
-    // order the provider returned them or the order they were inserted.
-    .orderBy(asc(seasons.seasonNumber));
+    // Ordered by number, so a tab strip reads 1, 2, 3 regardless of the order
+    // the provider returned them or the order they were inserted -- except
+    // that season 0, the specials, sorts LAST rather than first. Providers
+    // number specials 0, so a naive ascending sort opens a show on its
+    // specials instead of its first episode. Postgres orders false before
+    // true, so the boolean expression puts every real season ahead of it.
+    .orderBy(sql`(${seasons.seasonNumber} = 0)`, asc(seasons.seasonNumber));
 
   return rows.map((r) => ({
     seasonNumber: r.seasonNumber,
