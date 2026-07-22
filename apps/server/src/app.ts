@@ -135,8 +135,21 @@ export async function createApp(deps: AppDeps): Promise<HarborApp> {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
+        // script-src stays strict. This is the directive that stops code
+        // execution, and nothing in Harbor needs inline script.
         scriptSrc: ["'self'"],
-        styleSrc: ["'self'"],
+        // style-src allows inline, deliberately and narrowly.
+        //
+        // Radix positions every floating primitive -- select, dropdown menu,
+        // tooltip, popover, dialog -- by writing inline styles. Under a
+        // strict style-src the browser drops them, so the menu renders
+        // unanchored and the console fills with violations. A nonce would be
+        // the rigorous answer, but nonces must be minted per response and
+        // Harbor's frontend is a static bundle served from disk.
+        //
+        // The residual risk is UI redressing rather than code execution,
+        // which is why the relaxation is confined to this one directive.
+        styleSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", "data:"],
         fontSrc: ["'self'"],
         connectSrc: ["'self'"],

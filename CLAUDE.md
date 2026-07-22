@@ -1249,6 +1249,15 @@ Required controls:
 * Content Security Policy.
 * Trusted-proxy configuration.
 
+The policy keeps `script-src 'self'` — the directive that prevents code
+execution — and permits `'unsafe-inline'` for `style-src` alone. Radix
+positions every floating primitive (select, dropdown menu, tooltip, popover,
+dialog) with inline styles, which a strict `style-src` drops, leaving menus
+unanchored. Nonces are the rigorous alternative and do not apply: they must be
+minted per response, and Harbor serves a static frontend bundle from disk. The
+residual risk is UI redressing rather than code execution, which is why the
+relaxation is confined to that one directive and pinned by a test.
+
 ## SSRF Protection
 
 Provider and image proxy features create SSRF risk.

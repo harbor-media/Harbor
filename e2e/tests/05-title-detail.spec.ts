@@ -12,6 +12,21 @@ const TMDB_FIXTURE = "http://127.0.0.1:3101";
 
 test.describe.configure({ mode: "serial" });
 
+/**
+ * Picks a value from a shadcn/Radix Select.
+ *
+ * These are not native <select> elements: the trigger is a combobox button
+ * and the choices are role="option" divs rendered in a portal, so
+ * selectOption() and .locator("option") do not apply. Driving it by role is
+ * also closer to what a person does -- open the control, then choose.
+ */
+async function chooseFrom(scope: Page, control: string, option: string): Promise<void> {
+  await scope.getByRole("combobox", { name: control }).click();
+  await scope.getByRole("option", { name: option, exact: true }).click();
+}
+
+
+
 async function signIn(page: Page): Promise<void> {
   await page.goto("/login");
   await page.getByLabel("Username or email").fill(OWNER.username);
@@ -64,9 +79,8 @@ test("a series page shows season tabs and switching changes the episodes", async
   await expect(page.getByRole("navigation", { name: "Seasons" })).toBeVisible();
   await expect(page.getByText("Pilot")).toBeVisible();
 
-  // A native select, driven the way the invitations dropdowns already are.
   // Tabs were replaced because a twenty-season show cannot wear a tab strip.
-  await page.getByLabel("Season", { exact: true }).selectOption("2");
+  await chooseFrom(page, "Season", "Season 2");
 
   await expect(page).toHaveURL(/\/series\/[0-9a-f-]{36}\/season\/2$/);
   await expect(page.getByText("In My Time of Dying")).toBeVisible();

@@ -26,6 +26,28 @@ const OPEN_REGISTRANT = {
 
 test.describe.configure({ mode: "serial" });
 
+/**
+ * Picks a value from a shadcn/Radix Select.
+ *
+ * These are not native <select> elements: the trigger is a combobox button
+ * and the choices are role="option" divs rendered in a portal, so
+ * selectOption() and .locator("option") do not apply. Driving it by role is
+ * also closer to what a person does -- open the control, then choose.
+ */
+async function chooseFrom(scope: Page, control: string, option: string): Promise<void> {
+  await scope.getByRole("combobox", { name: control }).click();
+  await scope.getByRole("option", { name: option, exact: true }).click();
+}
+
+/** The choices a Select offers, read by opening it. */
+async function optionsOf(scope: Page, control: string): Promise<string[]> {
+  await scope.getByRole("combobox", { name: control }).click();
+  const items = await scope.getByRole("option").allInnerTexts();
+  await scope.keyboard.press("Escape");
+  return items;
+}
+
+
 const ALLOWED_CONSOLE_PATTERNS = [
   // Expected 400/401/403/409 fetch failures from deliberate negative cases
   // (invalid/spent invite tokens, unauthenticated /auth/me probes, etc).
@@ -68,7 +90,7 @@ test("owner invites a user who registers and lands signed in; owner sees the inv
   await expect(page.getByRole("heading", { name: "Invitations", exact: true })).toBeVisible();
 
   // Owner may grant administrator; select the user role for this invite.
-  await page.getByLabel("Role").selectOption("user");
+  await chooseFrom(page, "Role", "user");
   await page.getByRole("button", { name: "Create invitation" }).click();
 
   const inviteUrl = await page.getByLabel("Invite link").inputValue();
@@ -116,7 +138,7 @@ test("the owner's create-invite dropdown offers administrator, user and guest", 
   await page.goto("/admin/invitations");
   await expect(page.getByRole("heading", { name: "Invitations", exact: true })).toBeVisible();
 
-  const roleOptions = await page.getByLabel("Role").locator("option").allInnerTexts();
+  const roleOptions = await optionsOf(page, "Role");
   expect(roleOptions).toEqual(expect.arrayContaining(["administrator", "user", "guest"]));
 
   expect(consoleErrors).toEqual([]);
@@ -131,7 +153,7 @@ test("an administrator cannot grant the administrator role (dropdown omits it)",
   // Owner mints an administrator invite (owner CAN grant administrator).
   await signIn(page, OWNER.username, OWNER.password);
   await page.goto("/admin/invitations");
-  await page.getByLabel("Role").selectOption("administrator");
+  await chooseFrom(page, "Role", "administrator");
   await page.getByRole("button", { name: "Create invitation" }).click();
   const adminInviteUrl = await page.getByLabel("Invite link").inputValue();
 
@@ -150,7 +172,7 @@ test("an administrator cannot grant the administrator role (dropdown omits it)",
   // As that administrator, the invitations page must not offer "administrator".
   await adminPage.goto("/admin/invitations");
   await expect(adminPage.getByRole("heading", { name: "Invitations", exact: true })).toBeVisible();
-  const roleOptions = await adminPage.getByLabel("Role").locator("option").allInnerTexts();
+  const roleOptions = await optionsOf(adminPage, "Role");
   expect(roleOptions).not.toContain("administrator");
   expect(roleOptions).toContain("user");
 
@@ -168,7 +190,7 @@ test("open registration lets a visitor self-register without an invite, then the
   // Owner enables open registration, confirming the risk acknowledgement.
   await signIn(page, OWNER.username, OWNER.password);
   await page.goto("/admin/invitations");
-  await page.getByLabel("Mode").selectOption("open");
+  await chooseFrom(page, "Mode", "open");
   await expect(
     page.getByRole("alert").filter({ hasText: "Open registration lets anyone" }),
   ).toBeVisible();
@@ -201,7 +223,7 @@ test("open registration lets a visitor self-register without an invite, then the
   // Cleanup: return to invitation-only mode so later assertions in the
   // serial suite aren't affected, and confirm the link disappears again.
   await page.goto("/admin/invitations");
-  await page.getByLabel("Mode").selectOption("invitation-only");
+  await chooseFrom(page, "Mode", "invitation-only");
   await expect(page.getByText(/Anyone can create an account/)).toHaveCount(0);
 
   const cleanupContext = await browser.newContext();

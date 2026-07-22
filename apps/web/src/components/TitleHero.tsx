@@ -2,6 +2,7 @@ import type { TitleDetailResponse } from "@harbor/shared";
 import type { JSX } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { imageUrl } from "../images";
 import { metaLine } from "../titles";
 
@@ -114,10 +115,10 @@ export function TitleHeader({
 export function TitleHeaderSkeleton(): JSX.Element {
   return (
     <div aria-hidden="true" className="flex flex-col items-center pt-16">
-      <div className="h-14 w-2/3 max-w-xl rounded bg-secondary" />
-      <div className="mt-4 h-4 w-40 rounded bg-secondary" />
-      <div className="mt-8 h-11 w-64 rounded-full bg-secondary" />
-      <div className="mt-14 h-16 w-full max-w-4xl rounded bg-secondary" />
+      <Skeleton className="h-14 w-2/3 max-w-xl" />
+      <Skeleton className="mt-4 h-4 w-40" />
+      <Skeleton className="mt-8 h-11 w-64 rounded-full" />
+      <Skeleton className="mt-14 h-16 w-full max-w-4xl" />
     </div>
   );
 }

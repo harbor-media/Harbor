@@ -6,7 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   useCreateInvitation,
   useInvitations,
@@ -16,19 +22,6 @@ import {
 } from "../invitations";
 
 const GRANTABLE: UserRole[] = ["administrator", "user", "guest"];
-
-/**
- * Styling for the two native <select> elements, matched to the Input
- * primitive so they read as one family.
- *
- * They stay native deliberately. The end-to-end suite drives them with
- * selectOption() and reads their choices via .locator("option") -- both
- * native-select APIs. Radix Select renders a listbox of divs with no
- * <option> elements, so swapping it in would break four tests, including
- * the one asserting an administrator cannot grant the administrator role.
- */
-const SELECT_CLASS =
-  "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
 
 export function Invitations(): JSX.Element {
   const currentUser = useCurrentUser();
@@ -87,18 +80,23 @@ export function Invitations(): JSX.Element {
             <Label className="block" htmlFor="role">
               Role
             </Label>
-            <select
-              id="role"
-              className={cn(SELECT_CLASS, "mt-1")}
+            <Select
               value={role}
-              onChange={(e) => setRole(e.target.value as UserRole)}
+              onValueChange={(value) => {
+                setRole(value as UserRole);
+              }}
             >
-              {grantable.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="role" className="mt-1 w-full" aria-label="Role">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {grantable.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {r}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
             <Label className="mt-4 block" htmlFor="email">
               Email (optional)
@@ -186,16 +184,21 @@ export function Invitations(): JSX.Element {
           <Label className="mt-4 block" htmlFor="registrationMode">
             Mode
           </Label>
-          <select
-            id="registrationMode"
-            className={cn(SELECT_CLASS, "mt-1")}
+          <Select
             value={registrationMode.data ?? "invitation-only"}
-            onChange={(e) => onModeSelect(e.target.value as RegistrationMode)}
+            onValueChange={(value) => {
+              onModeSelect(value as RegistrationMode);
+            }}
           >
-            <option value="disabled">disabled</option>
-            <option value="invitation-only">invitation-only</option>
-            <option value="open">open</option>
-          </select>
+            <SelectTrigger id="registrationMode" className="mt-1 w-full" aria-label="Mode">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="disabled">disabled</SelectItem>
+              <SelectItem value="invitation-only">invitation-only</SelectItem>
+              <SelectItem value="open">open</SelectItem>
+            </SelectContent>
+          </Select>
 
           {pendingOpenMode ? (
             <div className="mt-2 rounded-lg bg-background p-3">
