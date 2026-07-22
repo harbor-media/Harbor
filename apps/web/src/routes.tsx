@@ -11,6 +11,7 @@ import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { Search } from "./pages/Search";
 import { Setup } from "./pages/Setup";
+import { Title } from "./pages/Title";
 
 function RootLayout(): JSX.Element {
   const location = useLocation();
@@ -74,6 +75,9 @@ export const router = createBrowserRouter([
       { path: "register", Component: Register },
       { path: "home", Component: Home },
       { path: "search", Component: Search },
+      { path: "movie/:id", Component: Title },
+      { path: "series/:id", Component: Title },
+      { path: "series/:id/season/:season", Component: Title },
       { path: "admin/invitations", Component: Invitations },
       { path: "admin/metadata", Component: AdminMetadata },
     ],
