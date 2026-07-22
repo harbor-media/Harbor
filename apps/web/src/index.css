@@ -58,15 +58,6 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) * 1.4);
   --radius-2xl: calc(var(--radius) * 1.8);
-
-  /* LEGACY -- deleted in Task 7 once no page references them. Kept only so
-     pages restyled in later tasks keep rendering in the meantime. */
-  --color-harbor-950: oklch(0.185 0 0);
-  --color-harbor-900: oklch(0.225 0 0);
-  --color-harbor-800: oklch(0.285 0 0);
-  --color-accent-500: oklch(0.922 0 0);
-  --color-accent-400: oklch(0.922 0 0);
-  --radius-card: var(--radius-xl);
 }
 
 body {
