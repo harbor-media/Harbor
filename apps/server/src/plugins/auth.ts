@@ -22,6 +22,16 @@ export const PUBLIC_ROUTES: ReadonlySet<string> = new Set([
   `GET ${API_PREFIX}/health`,
   `GET ${API_PREFIX}/health/live`,
   `GET ${API_PREFIX}/health/ready`,
+  // HEAD as well as GET. Fastify auto-generates a HEAD route for every GET,
+  // and health probes commonly use HEAD -- `wget --spider`, which is exactly
+  // what this image's HEALTHCHECK runs, does. Because matching here is on the
+  // literal "METHOD /path", listing only GET left HEAD guarded, so the
+  // container healthcheck got a 401 against a perfectly healthy server and
+  // never passed. That makes `depends_on: service_healthy` hang and an
+  // orchestrator restart a container that is fine.
+  `HEAD ${API_PREFIX}/health`,
+  `HEAD ${API_PREFIX}/health/live`,
+  `HEAD ${API_PREFIX}/health/ready`,
   `GET ${API_PREFIX}/installation/state`,
   `POST ${API_PREFIX}/setup`,
   `POST ${API_PREFIX}/auth/login`,
