@@ -86,3 +86,15 @@ h2,
 h3 {
   font-family: var(--font-display);
 }
+
+/* Hidden only where an explicit affordance replaces it.
+   The season picker deliberately does NOT use this: there, the scrollbar was
+   the sole indication more content existed. A catalog row has previous/next
+   buttons and keyboard focus movement, so the native bar is redundant rather
+   than load-bearing. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
