@@ -1,3 +1,4 @@
+export * from "./catalog.js";
 export * from "./client.js";
 export * from "./detail.js";
 export * from "./installation.js";
