@@ -1,15 +1,18 @@
 import { encryptSecret, SecretDecryptionError } from "@harbor/crypto";
 import { getMetadataProviderConfig, saveMetadataProviderConfig } from "@harbor/database";
-import type {
-  MetadataConfigStatus,
-  SearchResponse,
-  SeasonResponse,
-  TitleDetailResponse,
+import {
+  CATALOG_KINDS,
+  type CatalogRowResponse,
+  type MetadataConfigStatus,
+  type SearchResponse,
+  type SeasonResponse,
+  type TitleDetailResponse,
 } from "@harbor/shared";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { HarborError } from "../../plugins/errors.js";
 import { requireRole } from "../../plugins/require-role.js";
+import { CatalogKindUnsupportedError, fetchCatalogRow } from "./catalog.js";
 import { MetadataNotConfiguredError, tmdbFactory } from "./config.js";
 import { fetchSeasonDetail, fetchTitleDetail, TitleNotFoundError } from "./detail.js";
 import { MetadataProviderError } from "./providers/types.js";
@@ -34,6 +37,10 @@ const SeasonParamsSchema = z.object({
   id: z.uuid(),
   season: z.coerce.number().int().min(0).max(1000),
 });
+
+// z.enum over the shared tuple, so an unknown kind is a 400 from validation
+// rather than a lookup miss deeper in the stack.
+const CatalogParamsSchema = z.object({ kind: z.enum(CATALOG_KINDS) });
 
 function toStatus(
   row: { enabled: boolean; encryptedApiKey: string | null; language: string; lastVerifiedAt: Date | null } | null,
@@ -61,6 +68,12 @@ function toHarborError(error: unknown): HarborError {
     // not the providers, and conflating them would send an operator looking
     // at TMDB when the request simply named something that does not exist.
     return new HarborError("NOT_FOUND", "Title not found.", 404);
+  }
+  if (error instanceof CatalogKindUnsupportedError) {
+    // 409, not 404: the row is a real concept, this installation's provider
+    // just cannot serve it. The client hides the row rather than showing an
+    // error, and an operator reading logs sees a capability gap, not a bug.
+    return new HarborError("CATALOG_KIND_UNSUPPORTED", error.message, 409);
   }
   // A stored key that will not decrypt means HARBOR_SECRET changed. Left
   // unmapped this returns a generic 500, which tells an operator nothing and
@@ -198,6 +211,25 @@ export const metadataRoutes: FastifyPluginAsync = async (fastify) => {
           tmdbBaseUrl: fastify.env.HARBOR_TMDB_BASE_URL,
         },
         parsed.data.id,
+      );
+    } catch (error) {
+      throw toHarborError(error);
+    }
+  });
+
+  fastify.get("/catalog/:kind", detailRateLimit, async (request): Promise<CatalogRowResponse> => {
+    const parsed = CatalogParamsSchema.safeParse(request.params);
+    if (!parsed.success) {
+      throw new HarborError("VALIDATION_FAILED", z.prettifyError(parsed.error), 400);
+    }
+    try {
+      return await fetchCatalogRow(
+        {
+          db: fastify.db,
+          harborSecret: fastify.env.HARBOR_SECRET,
+          tmdbBaseUrl: fastify.env.HARBOR_TMDB_BASE_URL,
+        },
+        parsed.data.kind,
       );
     } catch (error) {
       throw toHarborError(error);
