@@ -1453,10 +1453,13 @@ Harbor should use a dark-first interface.
 
 Brand direction:
 
-* Deep navy surfaces.
-* Blue and violet accent gradients.
-* Clean typography.
-* Large cinematic artwork.
+* Achromatic surfaces. Every surface and text token has chroma exactly zero.
+* One emphasis colour: Signal Off-White `oklch(0.922 0 0)`. On a dark canvas, high-contrast near-white *is* the accent. Harbor has no brand hue.
+* Colour is semantic, never decorative. Red means error, green success, amber warning, sky information. A screen with nothing wrong is essentially greyscale, and that is correct.
+* Never pure black or pure white. The canvas is `oklch(0.185 0 0)` and text is `oklch(0.985 0 0)`; the slight lift keeps the surface from reading as a void.
+* Hairline borders `oklch(1 0 0 / 10%)` and tonal layering instead of shadows.
+* Outfit for display, Geist for body, Geist Mono for labels and values that read as data. Fonts are bundled, never fetched from a CDN — the Content Security Policy sets `font-src 'self'`.
+* Large cinematic artwork carries the colour. The chrome is neutral precisely so posters are the only saturated thing on screen.
 * Strong contrast.
 * Soft focus states.
 * Minimal visual noise.
