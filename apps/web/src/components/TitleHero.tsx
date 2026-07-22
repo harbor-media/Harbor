@@ -79,18 +79,19 @@ export function TitleHeader({
               Phase 5 and the library in Phase 4. A button that silently does
               nothing reads as a bug; a disabled one with a reason reads as a
               roadmap. */}
-          <Button size="lg" className="rounded-full px-8" disabled title="Playback arrives in a later phase">
-            ▶ Play
-          </Button>
-          <Button
-            variant="secondary"
-            size="lg"
-            className="rounded-full"
-            disabled
-            title="The library arrives in a later phase"
-          >
-            Watchlist
-          </Button>
+          {/* The explanation sits on a wrapping span: React Aria buttons do
+              not forward a title attribute, and a disabled control gives no
+              hint on its own about why. */}
+          <span title="Playback arrives in a later phase">
+            <Button size="lg" className="rounded-full px-8" isDisabled>
+              ▶ Play
+            </Button>
+          </span>
+          <span title="The library arrives in a later phase">
+            <Button variant="secondary" size="lg" className="rounded-full" isDisabled>
+              Watchlist
+            </Button>
+          </span>
         </div>
       </div>
 

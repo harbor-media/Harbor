@@ -43,10 +43,10 @@ export function Home(): JSX.Element {
         <Button
           type="button"
           variant="secondary"
-          onClick={() => {
+          onPress={() => {
             logout.mutate();
           }}
-          disabled={logout.isPending}
+          isDisabled={logout.isPending}
           className="mt-6 w-full"
         >
           {logout.isPending ? "Signing out…" : "Sign out"}

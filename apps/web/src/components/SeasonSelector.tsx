@@ -35,17 +35,18 @@ export function SeasonSelector({
   return (
     <nav aria-label="Seasons">
       <Select
-        value={active === null ? undefined : String(active)}
-        onValueChange={(value) => {
-          void navigate(`/series/${titleId}/season/${value}`);
+        aria-label="Season"
+        selectedKey={active === null ? null : String(active)}
+        onSelectionChange={(key) => {
+          void navigate(`/series/${titleId}/season/${String(key)}`);
         }}
       >
-        <SelectTrigger className="w-56" aria-label="Season">
-          <SelectValue placeholder="Select a season" />
+        <SelectTrigger className="w-56">
+          <SelectValue />
         </SelectTrigger>
         <SelectContent>
           {seasons.map((season) => (
-            <SelectItem key={season.seasonNumber} value={String(season.seasonNumber)}>
+            <SelectItem key={season.seasonNumber} id={String(season.seasonNumber)}>
               {label(season)}
             </SelectItem>
           ))}

@@ -124,15 +124,15 @@ export function AdminMetadata(): JSX.Element {
                 type="button"
                 variant="secondary"
                 className="flex-1"
-                disabled={keyMissing || testKey.isPending}
-                onClick={onTest}
+                isDisabled={keyMissing || testKey.isPending}
+                onPress={onTest}
               >
                 {testKey.isPending ? "Testing…" : "Test connection"}
               </Button>
               <Button
                 type="submit"
                 className="flex-1"
-                disabled={keyMissing || saveConfig.isPending}
+                isDisabled={keyMissing || saveConfig.isPending}
               >
                 {saveConfig.isPending ? "Saving…" : "Save"}
               </Button>

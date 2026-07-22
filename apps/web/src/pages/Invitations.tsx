@@ -77,21 +77,25 @@ export function Invitations(): JSX.Element {
         <Card className="mt-6 p-8">
           <h2 className="font-display text-lg">Create an invitation</h2>
           <form className="mt-4" onSubmit={onCreate}>
-            <Label className="block" htmlFor="role">
-              Role
-            </Label>
             <Select
-              value={role}
-              onValueChange={(value) => {
-                setRole(value as UserRole);
+              className="w-full"
+              selectedKey={role}
+              onSelectionChange={(key) => {
+                setRole(String(key) as UserRole);
               }}
             >
-              <SelectTrigger id="role" className="mt-1 w-full" aria-label="Role">
+              {/* The label lives inside Select, not beside it with htmlFor.
+                  React Aria points the trigger's aria-labelledby at the slot
+                  label, and aria-labelledby beats aria-label -- so a label
+                  placed outside leaves the control announced as its bare
+                  value, with no field name at all. */}
+              <Label className="block">Role</Label>
+              <SelectTrigger className="mt-1 w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {grantable.map((r) => (
-                  <SelectItem key={r} value={r}>
+                  <SelectItem key={r} id={r}>
                     {r}
                   </SelectItem>
                 ))}
@@ -136,7 +140,7 @@ export function Invitations(): JSX.Element {
             <Button
               type="submit"
               className="mt-6 w-full"
-              disabled={createInvitation.isPending || grantable.length === 0}
+              isDisabled={createInvitation.isPending || grantable.length === 0}
             >
               {createInvitation.isPending ? "Creating…" : "Create invitation"}
             </Button>
@@ -169,7 +173,7 @@ export function Invitations(): JSX.Element {
                 type="button"
                 variant="secondary"
                 className="mt-2 w-full"
-                onClick={() => {
+                onPress={() => {
                   void navigator.clipboard.writeText(inviteUrl).then(() => setCopied(true));
                 }}
               >
@@ -181,22 +185,21 @@ export function Invitations(): JSX.Element {
 
         <Card className="mt-6 p-8">
           <h2 className="font-display text-lg">Registration mode</h2>
-          <Label className="mt-4 block" htmlFor="registrationMode">
-            Mode
-          </Label>
           <Select
-            value={registrationMode.data ?? "invitation-only"}
-            onValueChange={(value) => {
-              onModeSelect(value as RegistrationMode);
+            className="mt-4 w-full"
+            selectedKey={registrationMode.data ?? "invitation-only"}
+            onSelectionChange={(key) => {
+              onModeSelect(String(key) as RegistrationMode);
             }}
           >
-            <SelectTrigger id="registrationMode" className="mt-1 w-full" aria-label="Mode">
+            <Label className="block">Mode</Label>
+            <SelectTrigger className="mt-1 w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="disabled">disabled</SelectItem>
-              <SelectItem value="invitation-only">invitation-only</SelectItem>
-              <SelectItem value="open">open</SelectItem>
+              <SelectItem id="disabled">disabled</SelectItem>
+              <SelectItem id="invitation-only">invitation-only</SelectItem>
+              <SelectItem id="open">open</SelectItem>
             </SelectContent>
           </Select>
 
@@ -209,7 +212,7 @@ export function Invitations(): JSX.Element {
                 <Button
                   type="button"
                   size="sm"
-                  onClick={onConfirmOpenMode}
+                  onPress={onConfirmOpenMode}
                 >
                   Confirm open registration
                 </Button>
@@ -217,7 +220,7 @@ export function Invitations(): JSX.Element {
                   type="button"
                   size="sm"
                   variant="secondary"
-                  onClick={() => setPendingOpenMode(false)}
+                  onPress={() => setPendingOpenMode(false)}
                 >
                   Cancel
                 </Button>
@@ -264,8 +267,8 @@ export function Invitations(): JSX.Element {
                     type="button"
                     size="sm"
                     variant="secondary"
-                    disabled={revokeInvitation.isPending}
-                    onClick={() => revokeInvitation.mutate(invite.id)}
+                    isDisabled={revokeInvitation.isPending}
+                    onPress={() => revokeInvitation.mutate(invite.id)}
                   >
                     Revoke
                   </Button>

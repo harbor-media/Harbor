@@ -13,8 +13,9 @@
    accordion/scroll-fade/shimmer keyframes. Contains no color tokens, so it
    cannot shadow the achromatic theme below.
 
-   Harbor is on shadcn's Radix build (`-b radix`), not the newer base-ui
-   default, matching the Radix primitives CLAUDE.md already specifies. */
+   Harbor is on shadcn's React Aria build (`-b aria`), not the default
+   base-ui one: React Aria Components carry the accessibility behaviour
+   CLAUDE.md's WCAG 2.2 AA target depends on. */
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 

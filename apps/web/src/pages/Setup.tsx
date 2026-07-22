@@ -101,7 +101,7 @@ export function Setup(): JSX.Element {
             </Alert>
           )}
 
-          <Button type="submit" disabled={setup.isPending} className="mt-6 w-full">
+          <Button type="submit" isDisabled={setup.isPending} className="mt-6 w-full">
             {setup.isPending ? "Creating…" : "Create owner account"}
           </Button>
         </Card>

@@ -337,7 +337,7 @@ Use:
 * TanStack Query.
 * Zustand.
 * Tailwind CSS.
-* Radix UI primitives.
+* React Aria Components primitives, via shadcn's `aria` base.
 * Lucide icons.
 * Motion for intentional animations.
 * React Hook Form.
@@ -1250,7 +1250,7 @@ Required controls:
 * Trusted-proxy configuration.
 
 The policy keeps `script-src 'self'` — the directive that prevents code
-execution — and permits `'unsafe-inline'` for `style-src` alone. Radix
+execution — and permits `'unsafe-inline'` for `style-src` alone. React Aria
 positions every floating primitive (select, dropdown menu, tooltip, popover,
 dialog) with inline styles, which a strict `style-src` drops, leaving menus
 unanchored. Nonces are the rigorous alternative and do not apply: they must be

@@ -85,7 +85,7 @@ export function Search(): JSX.Element {
               onChange={(e) => setDraft(e.target.value)}
               placeholder="Blade Runner"
             />
-            <Button type="submit" disabled={draft.trim() === "" || results.isFetching}>
+            <Button type="submit" isDisabled={draft.trim() === "" || results.isFetching}>
               {results.isFetching ? "Searching…" : "Search"}
             </Button>
           </div>

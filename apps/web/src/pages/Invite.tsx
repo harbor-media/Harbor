@@ -129,7 +129,7 @@ export function Invite(): JSX.Element {
             </Alert>
           )}
 
-          <Button type="submit" disabled={register.isPending} className="mt-6 w-full">
+          <Button type="submit" isDisabled={register.isPending} className="mt-6 w-full">
             {register.isPending ? "Creating…" : "Create account"}
           </Button>
         </Card>

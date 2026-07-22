@@ -23,7 +23,7 @@ describe("security headers", () => {
 
 describe("content security policy asymmetry", () => {
   /**
-   * style-src permits inline so Radix can position its floating primitives;
+   * style-src permits inline so React Aria can position its floating primitives;
    * script-src must not follow it. These are pinned together so the
    * relaxation cannot spread by symmetry later -- someone reading only
    * style-src could reasonably assume inline is fine generally, and it is

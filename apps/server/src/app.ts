@@ -140,7 +140,7 @@ export async function createApp(deps: AppDeps): Promise<HarborApp> {
         scriptSrc: ["'self'"],
         // style-src allows inline, deliberately and narrowly.
         //
-        // Radix positions every floating primitive -- select, dropdown menu,
+        // React Aria positions every floating primitive -- select, dropdown menu,
         // tooltip, popover, dialog -- by writing inline styles. Under a
         // strict style-src the browser drops them, so the menu renders
         // unanchored and the console fills with violations. A nonce would be

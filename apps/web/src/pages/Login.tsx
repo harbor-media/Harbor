@@ -56,7 +56,7 @@ export function Login(): JSX.Element {
             </Alert>
           )}
 
-          <Button type="submit" disabled={login.isPending} className="mt-6 w-full">
+          <Button type="submit" isDisabled={login.isPending} className="mt-6 w-full">
             {login.isPending ? "Signing in…" : "Sign in"}
           </Button>
 

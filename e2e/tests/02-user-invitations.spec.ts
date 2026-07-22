@@ -27,21 +27,22 @@ const OPEN_REGISTRANT = {
 test.describe.configure({ mode: "serial" });
 
 /**
- * Picks a value from a shadcn/Radix Select.
+ * Picks a value from a shadcn/React Aria Select.
  *
- * These are not native <select> elements: the trigger is a combobox button
- * and the choices are role="option" divs rendered in a portal, so
- * selectOption() and .locator("option") do not apply. Driving it by role is
- * also closer to what a person does -- open the control, then choose.
+ * These are not native <select> elements. React Aria renders the trigger as
+ * a button with aria-haspopup and the choices as role="option" items in a
+ * portal, so selectOption() and .locator("option") do not apply. Note the
+ * trigger is a button, not a combobox -- that is where Radix and React Aria
+ * differ, and querying the wrong role times out rather than failing clearly.
  */
 async function chooseFrom(scope: Page, control: string, option: string): Promise<void> {
-  await scope.getByRole("combobox", { name: control }).click();
+  await scope.getByRole("button", { name: control }).click();
   await scope.getByRole("option", { name: option, exact: true }).click();
 }
 
 /** The choices a Select offers, read by opening it. */
 async function optionsOf(scope: Page, control: string): Promise<string[]> {
-  await scope.getByRole("combobox", { name: control }).click();
+  await scope.getByRole("button", { name: control }).click();
   const items = await scope.getByRole("option").allInnerTexts();
   await scope.keyboard.press("Escape");
   return items;
