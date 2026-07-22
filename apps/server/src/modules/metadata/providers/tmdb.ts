@@ -1,4 +1,5 @@
 import type { NormalizedEpisode, NormalizedTitle } from "@harbor/database";
+import { z } from "zod";
 import {
   MetadataProviderError,
   type MetadataProvider,
@@ -8,18 +9,98 @@ import {
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 
-interface TmdbSearchItem {
-  id: number;
-  media_type?: string;
-  title?: string;
-  name?: string;
-  original_title?: string;
-  original_name?: string;
-  release_date?: string;
-  first_air_date?: string;
-  overview?: string;
-  poster_path?: string | null;
-  backdrop_path?: string | null;
+/**
+ * TMDB is an external boundary, so nothing crosses it untyped at runtime.
+ *
+ * Casting the payload instead let a malformed response reach code that
+ * assumed its shape: a `genres` that was not an array threw a raw TypeError
+ * that escaped MetadataProviderError and surfaced as a bare 500, and an
+ * episode missing `episode_number` carried `undefined` all the way into a
+ * NOT NULL column, turning a provider quirk into a database error on an
+ * ordinary read.
+ *
+ * The schemas are permissive about unknown keys -- Zod strips them, so TMDB
+ * adding a field never breaks Harbor -- and strict about the handful of
+ * fields that are actually load-bearing.
+ */
+const searchItemSchema = z.object({
+  id: z.number(),
+  media_type: z.string().optional(),
+  title: z.string().optional(),
+  name: z.string().optional(),
+  original_title: z.string().optional(),
+  original_name: z.string().optional(),
+  release_date: z.string().optional(),
+  first_air_date: z.string().optional(),
+  overview: z.string().optional(),
+  poster_path: z.string().nullish(),
+  backdrop_path: z.string().nullish(),
+});
+
+type TmdbSearchItem = z.infer<typeof searchItemSchema>;
+
+const searchResponseSchema = z.object({
+  // Per-item, not array-wide: a single unusable result must not discard the
+  // rest of the page. Multi-search already drops people for the same reason.
+  results: z.array(z.unknown()).optional(),
+});
+
+const genreSchema = z.object({ name: z.string() });
+
+const seasonSummarySchema = z.object({
+  season_number: z.number(),
+  name: z.string().nullish(),
+  overview: z.string().nullish(),
+  poster_path: z.string().nullish(),
+  episode_count: z.number().nullish(),
+  air_date: z.string().nullish(),
+});
+
+const detailSchema = z.object({
+  original_title: z.string().nullish(),
+  original_name: z.string().nullish(),
+  release_date: z.string().nullish(),
+  first_air_date: z.string().nullish(),
+  overview: z.string().nullish(),
+  poster_path: z.string().nullish(),
+  backdrop_path: z.string().nullish(),
+  runtime: z.number().nullish(),
+  episode_run_time: z.array(z.number()).nullish(),
+  genres: z.array(genreSchema).nullish(),
+  seasons: z.array(seasonSummarySchema).nullish(),
+});
+
+const episodeSchema = z.object({
+  episode_number: z.number(),
+  name: z.string().nullish(),
+  overview: z.string().nullish(),
+  still_path: z.string().nullish(),
+  runtime: z.number().nullish(),
+  air_date: z.string().nullish(),
+});
+
+const seasonResponseSchema = z.object({
+  episodes: z.array(episodeSchema).nullish(),
+});
+
+/**
+ * A payload that does not match is treated as an outage, not a crash.
+ *
+ * "unavailable" is the honest classification: Harbor cannot use what the
+ * provider sent, which is the same practical situation as not reaching it,
+ * and it routes into the existing degraded path so a cached title still
+ * renders. The validation issue is deliberately not included in the message
+ * -- it can quote payload fragments, and this text reaches the client.
+ */
+function parseOrUnavailable<T>(schema: z.ZodType<T>, value: unknown): T {
+  const result = schema.safeParse(value);
+  if (!result.success) {
+    throw new MetadataProviderError(
+      "unavailable",
+      "The metadata provider returned an unexpected response.",
+    );
+  }
+  return result.data;
 }
 
 function yearOf(value: string | undefined): number | null {
@@ -49,29 +130,6 @@ function normalize(item: TmdbSearchItem): NormalizedTitle | null {
   };
 }
 
-interface TmdbGenre {
-  id: number;
-  name: string;
-}
-
-interface TmdbSeasonSummary {
-  season_number: number;
-  name?: string;
-  overview?: string;
-  poster_path?: string | null;
-  episode_count?: number;
-  air_date?: string | null;
-}
-
-interface TmdbEpisode {
-  episode_number: number;
-  name?: string;
-  overview?: string;
-  still_path?: string | null;
-  runtime?: number | null;
-  air_date?: string | null;
-}
-
 /**
  * Providers use "" for an unknown value as often as null. Storing the empty
  * string would make an absent overview render as a blank block instead of
@@ -81,25 +139,29 @@ function textOrNull(value: string | null | undefined): string | null {
   return value === undefined || value === null || value === "" ? null : value;
 }
 
-function toDetail(payload: Record<string, unknown>, isMovie: boolean): ProviderTitleDetail {
-  const genres = (payload["genres"] as TmdbGenre[] | undefined) ?? [];
-  const runTimes = (payload["episode_run_time"] as number[] | undefined) ?? [];
-  const seasonList = (payload["seasons"] as TmdbSeasonSummary[] | undefined) ?? [];
+function toDetail(
+  payload: z.infer<typeof detailSchema>,
+  isMovie: boolean,
+): ProviderTitleDetail {
+  const runTimes = payload.episode_run_time ?? [];
+  const seasonList = payload.seasons ?? [];
 
   return {
     originalTitle: textOrNull(
-      (isMovie ? payload["original_title"] : payload["original_name"]) as string | undefined,
+      isMovie ? payload.original_title : payload.original_name,
     ),
     year: yearOf(
-      (isMovie ? payload["release_date"] : payload["first_air_date"]) as string | undefined,
+      isMovie
+        ? (payload.release_date ?? undefined)
+        : (payload.first_air_date ?? undefined),
     ),
-    overview: textOrNull(payload["overview"] as string | undefined),
-    posterPath: textOrNull(payload["poster_path"] as string | null | undefined),
-    backdropPath: textOrNull(payload["backdrop_path"] as string | null | undefined),
+    overview: textOrNull(payload.overview),
+    posterPath: textOrNull(payload.poster_path),
+    backdropPath: textOrNull(payload.backdrop_path),
     // A movie carries a single runtime; a series carries a list of typical
     // episode lengths, whose first entry is the representative one.
-    runtime: isMovie ? ((payload["runtime"] as number | undefined) ?? null) : (runTimes[0] ?? null),
-    genres: genres.map((g) => g.name),
+    runtime: isMovie ? (payload.runtime ?? null) : (runTimes[0] ?? null),
+    genres: (payload.genres ?? []).map((g) => g.name),
     seasons: isMovie
       ? []
       : seasonList.map((sn) => ({
@@ -128,21 +190,34 @@ export function createTmdbProvider(
   // The credential travels in the Authorization header, never the query
   // string: query strings land in proxy logs, browser history, and Referer
   // headers.
-  async function call(path: string, params: URLSearchParams, signal: AbortSignal): Promise<unknown> {
+  async function call(
+    path: string,
+    params: URLSearchParams,
+    signal: AbortSignal,
+  ): Promise<unknown> {
     let response: Response;
     try {
       response = await doFetch(`${baseUrl}${path}?${params.toString()}`, {
-        headers: { authorization: `Bearer ${apiKey}`, accept: "application/json" },
+        headers: {
+          authorization: `Bearer ${apiKey}`,
+          accept: "application/json",
+        },
         signal,
       });
     } catch {
       // The upstream error is deliberately swallowed rather than chained: it
       // can contain the request URL and header material.
-      throw new MetadataProviderError("unavailable", "The metadata provider could not be reached.");
+      throw new MetadataProviderError(
+        "unavailable",
+        "The metadata provider could not be reached.",
+      );
     }
 
     if (response.status === 401 || response.status === 403) {
-      throw new MetadataProviderError("unauthorized", "The metadata provider rejected the API key.");
+      throw new MetadataProviderError(
+        "unauthorized",
+        "The metadata provider rejected the API key.",
+      );
     }
     if (!response.ok) {
       throw new MetadataProviderError(
@@ -154,7 +229,10 @@ export function createTmdbProvider(
     try {
       return await response.json();
     } catch {
-      throw new MetadataProviderError("unavailable", "The metadata provider returned invalid JSON.");
+      throw new MetadataProviderError(
+        "unavailable",
+        "The metadata provider returned invalid JSON.",
+      );
     }
   }
 
@@ -165,17 +243,23 @@ export function createTmdbProvider(
       await call("/authentication", new URLSearchParams(), signal);
     },
 
-    async search(query: MetadataSearchQuery, signal: AbortSignal): Promise<NormalizedTitle[]> {
+    async search(
+      query: MetadataSearchQuery,
+      signal: AbortSignal,
+    ): Promise<NormalizedTitle[]> {
       const params = new URLSearchParams({
         query: query.query,
         language: query.language,
         include_adult: "false",
       });
-      const payload = (await call("/search/multi", params, signal)) as {
-        results?: TmdbSearchItem[];
-      };
-      return (payload.results ?? []).flatMap((item) => {
-        const normalized = normalize(item);
+      const payload = parseOrUnavailable(
+        searchResponseSchema,
+        await call("/search/multi", params, signal),
+      );
+      return (payload.results ?? []).flatMap((raw) => {
+        const item = searchItemSchema.safeParse(raw);
+        if (!item.success) return [];
+        const normalized = normalize(item.data);
         return normalized ? [normalized] : [];
       });
     },
@@ -185,11 +269,14 @@ export function createTmdbProvider(
       language: string,
       signal: AbortSignal,
     ): Promise<ProviderTitleDetail> {
-      const payload = (await call(
-        `/movie/${externalId}`,
-        new URLSearchParams({ language }),
-        signal,
-      )) as Record<string, unknown>;
+      const payload = parseOrUnavailable(
+        detailSchema,
+        await call(
+          `/movie/${encodeURIComponent(externalId)}`,
+          new URLSearchParams({ language }),
+          signal,
+        ),
+      );
       return toDetail(payload, true);
     },
 
@@ -198,11 +285,14 @@ export function createTmdbProvider(
       language: string,
       signal: AbortSignal,
     ): Promise<ProviderTitleDetail> {
-      const payload = (await call(
-        `/tv/${externalId}`,
-        new URLSearchParams({ language }),
-        signal,
-      )) as Record<string, unknown>;
+      const payload = parseOrUnavailable(
+        detailSchema,
+        await call(
+          `/tv/${encodeURIComponent(externalId)}`,
+          new URLSearchParams({ language }),
+          signal,
+        ),
+      );
       return toDetail(payload, false);
     },
 
@@ -212,11 +302,17 @@ export function createTmdbProvider(
       language: string,
       signal: AbortSignal,
     ): Promise<NormalizedEpisode[]> {
-      const payload = (await call(
-        `/tv/${externalId}/season/${String(seasonNumber)}`,
-        new URLSearchParams({ language }),
-        signal,
-      )) as { episodes?: TmdbEpisode[] };
+      // Encoded, even though TMDB ids are numeric today: the id comes from a
+      // database row, and a value with a slash in it would otherwise steer
+      // the request to a different endpoint.
+      const payload = parseOrUnavailable(
+        seasonResponseSchema,
+        await call(
+          `/tv/${encodeURIComponent(externalId)}/season/${String(seasonNumber)}`,
+          new URLSearchParams({ language }),
+          signal,
+        ),
+      );
 
       return (payload.episodes ?? []).map((e) => ({
         episodeNumber: e.episode_number,

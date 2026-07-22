@@ -164,3 +164,80 @@ describe("getSeason", () => {
     expect(String(fetchImpl.mock.calls[0]?.[0])).not.toContain("super-secret-key");
   });
 });
+
+// TMDB is an external boundary. Before these, the payload was cast rather
+// than parsed, so a malformed response was not a provider error at all --
+// it was a TypeError or a NOT NULL violation raised somewhere downstream.
+describe("provider payload validation", () => {
+  it("reports a malformed detail payload as a provider outage, not a crash", async () => {
+    const provider = createTmdbProvider("key", {
+      fetchImpl: fake(() => Promise.resolve(json({ ...MOVIE, genres: { name: "nope" } }))),
+    });
+
+    // The cast version reached `genres.map` and threw a raw TypeError, which
+    // escaped MetadataProviderError entirely and surfaced as a bare 500 with
+    // no provider context.
+    await expect(provider.getMovie("78", "en-US", SIGNAL())).rejects.toMatchObject({
+      name: "MetadataProviderError",
+      kind: "unavailable",
+    });
+  });
+
+  it("rejects an episode with no episode number rather than storing undefined", async () => {
+    const provider = createTmdbProvider("key", {
+      fetchImpl: fake(() =>
+        Promise.resolve(json({ episodes: [{ name: "Pilot", runtime: 48 }] })),
+      ),
+    });
+
+    // episode_number is NOT NULL in the database. Casting let `undefined`
+    // travel all the way into the insert, turning a provider quirk into a
+    // database error on an ordinary read path.
+    await expect(provider.getSeason("1622", 1, "en-US", SIGNAL())).rejects.toMatchObject({
+      kind: "unavailable",
+    });
+  });
+
+  it("does not leak payload details into the error message", async () => {
+    const provider = createTmdbProvider("key", {
+      fetchImpl: fake(() => Promise.resolve(json({ episodes: [{ secret: "s3cret" }] }))),
+    });
+
+    // The message reaches the client, and validation issues quote the
+    // offending value.
+    await expect(provider.getSeason("1622", 1, "en-US", SIGNAL())).rejects.toThrow(
+      /^The metadata provider returned an unexpected response\.$/,
+    );
+  });
+
+  it("drops one unusable search result without discarding the page", async () => {
+    const provider = createTmdbProvider("key", {
+      fetchImpl: fake(() =>
+        Promise.resolve(
+          json({
+            results: [
+              { id: "not-a-number", media_type: "movie", title: "Broken" },
+              { id: 78, media_type: "movie", title: "Blade Runner" },
+            ],
+          }),
+        ),
+      ),
+    });
+
+    const results = await provider.search({ query: "blade", language: "en-US" }, SIGNAL());
+
+    expect(results).toHaveLength(1);
+    expect(results[0]?.title).toBe("Blade Runner");
+  });
+
+  it("accepts unknown fields, so a TMDB addition does not break Harbor", async () => {
+    const provider = createTmdbProvider("key", {
+      fetchImpl: fake(() =>
+        Promise.resolve(json({ ...MOVIE, some_new_field: { nested: true } })),
+      ),
+    });
+
+    const detail = await provider.getMovie("78", "en-US", SIGNAL());
+    expect(detail.runtime).toBe(117);
+  });
+});
