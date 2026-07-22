@@ -21,14 +21,18 @@ export function SeasonTabs({
 }): JSX.Element {
   return (
     <nav aria-label="Seasons" className="border-b border-border">
-      {/* Scrolls rather than wraps: a twenty-season show must not push the
-          episode list off the screen.
+      {/* Wraps rather than scrolls.
 
-          overflow-y-hidden is required, not decorative. Per CSS, when
-          overflow-x is anything but visible, overflow-y computes from visible
-          to auto -- so overflow-x-auto alone renders a vertical scrollbar
-          inside the tab strip. */}
-      <ul className="flex gap-1 overflow-x-auto overflow-y-hidden">
+          A scrolling strip needs overflow-x: auto, which Windows draws as a
+          persistent bar that eats vertical space -- and which also forces
+          overflow-y from visible to auto, per CSS, adding a second scrollbar.
+          Hiding both would leave a strip that scrolls with no visible
+          affordance, so a long show's later seasons become unreachable
+          unless you happen to guess.
+
+          Wrapping costs a second line on a very long series and nothing at
+          all on a typical one. */}
+      <ul className="flex flex-wrap gap-1">
         {seasons.map((season) => {
           const current = season.seasonNumber === active;
           return (
