@@ -1,6 +1,11 @@
 import { type FormEvent, type JSX, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useInviteInspection, useRegister } from "../invitations";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 // The hyphen is escaped deliberately. Browsers compile the HTML `pattern`
 // attribute with the RegExp `v` flag, which rejects an unescaped trailing `-`
@@ -22,7 +27,7 @@ export function Invite(): JSX.Element {
 
   if (inspection.isPending) {
     return (
-      <main className="flex min-h-screen items-center justify-center p-8" role="status">
+      <main className="flex min-h-screen items-center justify-center bg-background p-8" role="status">
         Checking invitation…
       </main>
     );
@@ -30,13 +35,13 @@ export function Invite(): JSX.Element {
 
   if (inspection.isError || !inspection.data || !inspection.data.valid) {
     return (
-      <main className="flex min-h-screen items-center justify-center p-8">
-        <div className="w-full max-w-md rounded-card bg-harbor-900 p-8">
-          <h1 className="font-display text-2xl">Invitation</h1>
-          <p role="alert" className="mt-4 text-sm text-red-400">
-            This invitation is no longer valid.
-          </p>
-        </div>
+      <main className="flex min-h-screen items-center justify-center bg-background p-8">
+        <Card className="w-full max-w-md p-8">
+          <h1 className="font-display text-2xl text-foreground">Invitation</h1>
+          <Alert variant="destructive" className="mt-4">
+            <AlertDescription>This invitation is no longer valid.</AlertDescription>
+          </Alert>
+        </Card>
       </main>
     );
   }
@@ -55,81 +60,79 @@ export function Invite(): JSX.Element {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-8">
-      <form onSubmit={onSubmit} className="w-full max-w-md rounded-card bg-harbor-900 p-8">
-        <h1 className="font-display text-2xl">
-          You&apos;ve been invited as {inspection.data.role}
-        </h1>
+    <main className="flex min-h-screen items-center justify-center bg-background p-8">
+      <form onSubmit={onSubmit} className="w-full max-w-md">
+        <Card className="p-8">
+          <h1 className="font-display text-2xl text-foreground">
+            You&apos;ve been invited as {inspection.data.role}
+          </h1>
 
-        <label className="mt-6 block text-sm" htmlFor="username">
-          Username
-        </label>
-        <input
-          id="username"
-          required
-          minLength={3}
-          maxLength={32}
-          pattern={USERNAME_PATTERN}
-          autoComplete="username"
-          aria-describedby="username-hint"
-          className="mt-1 w-full rounded bg-harbor-950 p-2 focus:outline-none focus:ring-2 focus:ring-accent-500"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-        />
-        <p id="username-hint" className="mt-1 text-xs opacity-60">
-          3–32 characters. Letters, numbers, dots, underscores, and hyphens only. No &quot;@&quot;.
-        </p>
-
-        <label className="mt-4 block text-sm" htmlFor="email">
-          Email
-        </label>
-        <input
-          id="email"
-          type="email"
-          required
-          autoComplete="email"
-          className="mt-1 w-full rounded bg-harbor-950 p-2 focus:outline-none focus:ring-2 focus:ring-accent-500"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        {emailBound ? (
-          <p className="mt-1 text-xs opacity-60">
-            This invitation is bound to a specific email address. Enter it to continue.
+          <Label className="mt-6 block" htmlFor="username">
+            Username
+          </Label>
+          <Input
+            id="username"
+            required
+            minLength={3}
+            maxLength={32}
+            pattern={USERNAME_PATTERN}
+            autoComplete="username"
+            aria-describedby="username-hint"
+            className="mt-1"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
+          <p id="username-hint" className="mt-1 text-xs text-muted-foreground">
+            3–32 characters. Letters, numbers, dots, underscores, and hyphens only. No &quot;@&quot;.
           </p>
-        ) : null}
 
-        <label className="mt-4 block text-sm" htmlFor="password">
-          Password
-        </label>
-        <input
-          id="password"
-          type="password"
-          required
-          minLength={12}
-          maxLength={200}
-          autoComplete="new-password"
-          aria-describedby="password-hint"
-          className="mt-1 w-full rounded bg-harbor-950 p-2 focus:outline-none focus:ring-2 focus:ring-accent-500"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <p id="password-hint" className="mt-1 text-xs opacity-60">
-          At least 12 characters.
-        </p>
+          <Label className="mt-4 block" htmlFor="email">
+            Email
+          </Label>
+          <Input
+            id="email"
+            type="email"
+            required
+            autoComplete="email"
+            className="mt-1"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          {emailBound ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              This invitation is bound to a specific email address. Enter it to continue.
+            </p>
+          ) : null}
 
-        {register.isError && (
-          <p role="alert" aria-live="assertive" className="mt-4 text-sm text-red-400">
-            {register.error.message}
+          <Label className="mt-4 block" htmlFor="password">
+            Password
+          </Label>
+          <Input
+            id="password"
+            type="password"
+            required
+            minLength={12}
+            maxLength={200}
+            autoComplete="new-password"
+            aria-describedby="password-hint"
+            className="mt-1"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <p id="password-hint" className="mt-1 text-xs text-muted-foreground">
+            At least 12 characters.
           </p>
-        )}
 
-        <button
-          type="submit"
-          disabled={register.isPending}
-          className="mt-6 w-full rounded bg-accent-500 p-2 font-medium disabled:opacity-50"
-        >
-          {register.isPending ? "Creating…" : "Create account"}
-        </button>
+          {register.isError && (
+            <Alert variant="destructive" aria-live="assertive" className="mt-4">
+              <AlertDescription>{register.error.message}</AlertDescription>
+            </Alert>
+          )}
+
+          <Button type="submit" disabled={register.isPending} className="mt-6 w-full">
+            {register.isPending ? "Creating…" : "Create account"}
+          </Button>
+        </Card>
       </form>
     </main>
   );
