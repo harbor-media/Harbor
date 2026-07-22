@@ -1,23 +1,72 @@
 @import "tailwindcss";
 
+/* Bundled, never CDN: Harbor's CSP sets font-src 'self', so a Google Fonts
+   link is blocked and falls back to system sans -- a silent failure that
+   presents as "the fonts didn't apply". Self-hosting also means no
+   third-party request announcing when someone opens their media server. */
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+@import "@fontsource-variable/outfit";
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --color-harbor-950: oklch(0.18 0.04 265);
-  --color-harbor-900: oklch(0.24 0.05 265);
-  --color-harbor-800: oklch(0.30 0.05 265);
-  --color-accent-500: oklch(0.62 0.19 275);
-  --color-accent-400: oklch(0.70 0.17 285);
-  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --radius-card: 0.75rem;
-}
+  /* Achromatic by design: chroma is exactly 0 on every surface and text
+     token. Color appears only where it carries meaning, which lets poster
+     artwork supply all the color on a catalog screen. */
+  --color-background: oklch(0.185 0 0);
+  --color-foreground: oklch(0.985 0 0);
+  --color-card: oklch(0.225 0 0);
+  --color-card-foreground: oklch(0.985 0 0);
+  --color-popover: oklch(0.225 0 0);
+  --color-popover-foreground: oklch(0.985 0 0);
+  --color-primary: oklch(0.922 0 0);
+  --color-primary-foreground: oklch(0.205 0 0);
+  --color-secondary: oklch(0.285 0 0);
+  --color-secondary-foreground: oklch(0.985 0 0);
+  --color-muted: oklch(0.285 0 0);
+  --color-muted-foreground: oklch(0.715 0 0);
+  --color-accent: oklch(0.285 0 0);
+  --color-accent-foreground: oklch(0.985 0 0);
+  --color-border: oklch(1 0 0 / 10%);
+  --color-input: oklch(1 0 0 / 15%);
+  --color-ring: oklch(0.556 0 0);
 
-:root {
-  --surface: var(--color-harbor-950);
-  --text: oklch(0.97 0.01 265);
+  /* Semantic status only. */
+  --color-destructive: oklch(0.704 0.191 22.216);
+  --color-success: oklch(0.696 0.17 162.48);
+  --color-warning: oklch(0.828 0.189 84.429);
+  --color-info: oklch(0.746 0.16 232.661);
+
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+  --font-display: "Outfit Variable", ui-sans-serif, system-ui, sans-serif;
+
+  --radius: 10px;
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+
+  /* LEGACY -- deleted in Task 7 once no page references them. Kept only so
+     pages restyled in later tasks keep rendering in the meantime. */
+  --color-harbor-950: oklch(0.185 0 0);
+  --color-harbor-900: oklch(0.225 0 0);
+  --color-harbor-800: oklch(0.285 0 0);
+  --color-accent-500: oklch(0.922 0 0);
+  --color-accent-400: oklch(0.922 0 0);
+  --radius-card: var(--radius-xl);
 }
 
 body {
-  background-color: var(--surface);
-  color: var(--text);
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
 }
