@@ -1,11 +1,17 @@
 import { encryptSecret, SecretDecryptionError } from "@harbor/crypto";
 import { getMetadataProviderConfig, saveMetadataProviderConfig } from "@harbor/database";
-import type { MetadataConfigStatus, SearchResponse } from "@harbor/shared";
+import type {
+  MetadataConfigStatus,
+  SearchResponse,
+  SeasonResponse,
+  TitleDetailResponse,
+} from "@harbor/shared";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { HarborError } from "../../plugins/errors.js";
 import { requireRole } from "../../plugins/require-role.js";
 import { MetadataNotConfiguredError, tmdbFactory } from "./config.js";
+import { fetchSeasonDetail, fetchTitleDetail, TitleNotFoundError } from "./detail.js";
 import { MetadataProviderError } from "./providers/types.js";
 import { searchTitles } from "./search.js";
 
@@ -21,6 +27,13 @@ const ConfigSchema = z.object({
 });
 
 const SearchQuerySchema = z.object({ q: z.string().trim().min(1).max(200) });
+
+const TitleParamsSchema = z.object({ id: z.uuid() });
+
+const SeasonParamsSchema = z.object({
+  id: z.uuid(),
+  season: z.coerce.number().int().min(0).max(1000),
+});
 
 function toStatus(
   row: { enabled: boolean; encryptedApiKey: string | null; language: string; lastVerifiedAt: Date | null } | null,
@@ -42,6 +55,12 @@ function toHarborError(error: unknown): HarborError {
       "No metadata provider is configured. An administrator can set one up in Settings.",
       409,
     );
+  }
+  if (error instanceof TitleNotFoundError) {
+    // 404 rather than a provider error: the title id is the clients problem,
+    // not the providers, and conflating them would send an operator looking
+    // at TMDB when the request simply named something that does not exist.
+    return new HarborError("NOT_FOUND", "Title not found.", 404);
   }
   // A stored key that will not decrypt means HARBOR_SECRET changed. Left
   // unmapped this returns a generic 500, which tells an operator nothing and
@@ -154,6 +173,54 @@ export const metadataRoutes: FastifyPluginAsync = async (fastify) => {
             tmdbBaseUrl: fastify.env.HARBOR_TMDB_BASE_URL,
           },
           parsed.data.q,
+        );
+      } catch (error) {
+        throw toHarborError(error);
+      }
+    },
+  );
+
+  // Generous compared with /search: opening one title page issues a detail
+  // request plus one per season tab the viewer opens, so the search limit
+  // would fire during ordinary browsing.
+  const detailRateLimit = { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } };
+
+  fastify.get("/titles/:id", detailRateLimit, async (request): Promise<TitleDetailResponse> => {
+    const parsed = TitleParamsSchema.safeParse(request.params);
+    if (!parsed.success) {
+      throw new HarborError("VALIDATION_FAILED", z.prettifyError(parsed.error), 400);
+    }
+    try {
+      return await fetchTitleDetail(
+        {
+          db: fastify.db,
+          harborSecret: fastify.env.HARBOR_SECRET,
+          tmdbBaseUrl: fastify.env.HARBOR_TMDB_BASE_URL,
+        },
+        parsed.data.id,
+      );
+    } catch (error) {
+      throw toHarborError(error);
+    }
+  });
+
+  fastify.get(
+    "/titles/:id/seasons/:season",
+    detailRateLimit,
+    async (request): Promise<SeasonResponse> => {
+      const parsed = SeasonParamsSchema.safeParse(request.params);
+      if (!parsed.success) {
+        throw new HarborError("VALIDATION_FAILED", z.prettifyError(parsed.error), 400);
+      }
+      try {
+        return await fetchSeasonDetail(
+          {
+            db: fastify.db,
+            harborSecret: fastify.env.HARBOR_SECRET,
+            tmdbBaseUrl: fastify.env.HARBOR_TMDB_BASE_URL,
+          },
+          parsed.data.id,
+          parsed.data.season,
         );
       } catch (error) {
         throw toHarborError(error);
