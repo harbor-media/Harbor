@@ -2,6 +2,10 @@ import { type FormEvent, type JSX, useState } from "react";
 import { Link } from "react-router";
 import { imageUrl } from "../images";
 import { ApiError, describeMetadataError, useSearch } from "../metadata";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 const TMDB_ATTRIBUTION =
   "This product uses the TMDB API but is not endorsed or certified by TMDB.";
@@ -24,7 +28,7 @@ function Poster({ path, title }: { path: string | null; title: string }): JSX.El
     return (
       <div
         aria-hidden="true"
-        className="h-[105px] w-[70px] shrink-0 rounded bg-harbor-800"
+        className="h-[105px] w-[70px] shrink-0 rounded bg-secondary"
       />
     );
   }
@@ -67,70 +71,66 @@ export function Search(): JSX.Element {
     results.error instanceof ApiError && results.error.code === "METADATA_NOT_CONFIGURED";
 
   return (
-    <main className="min-h-screen p-8">
+    <main className="min-h-screen bg-background p-8">
       <div className="mx-auto w-full max-w-2xl">
-        <h1 className="font-display text-2xl text-accent-500">Search</h1>
+        <h1 className="font-display text-2xl text-foreground">Search</h1>
 
         <form className="mt-6" onSubmit={onSubmit}>
-          <label className="block text-sm" htmlFor="query">
-            Title
-          </label>
+          <Label htmlFor="query">Title</Label>
           <div className="mt-1 flex gap-2">
-            <input
+            <Input
               id="query"
-              className="flex-1 rounded bg-harbor-950 p-2 focus:outline-none focus:ring-2 focus:ring-accent-500"
+              className="flex-1"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               placeholder="Blade Runner"
             />
-            <button
-              type="submit"
-              className="rounded bg-accent-500 px-4 font-medium disabled:opacity-50"
-              disabled={draft.trim() === "" || results.isFetching}
-            >
+            <Button type="submit" disabled={draft.trim() === "" || results.isFetching}>
               {results.isFetching ? "Searching…" : "Search"}
-            </button>
+            </Button>
           </div>
         </form>
 
         {results.isError ? (
-          <p role="alert" aria-live="assertive" className="mt-6 text-sm text-red-400">
-            {describeMetadataError(results.error)}
-            {notConfigured ? (
-              <>
-                {" "}
-                <Link className="underline" to="/admin/metadata">
-                  Configure a metadata provider
-                </Link>
-                .
-              </>
-            ) : null}
-          </p>
+          <Alert variant="destructive" aria-live="assertive" className="mt-6">
+            <AlertDescription>
+              {describeMetadataError(results.error)}
+              {notConfigured ? (
+                <>
+                  {" "}
+                  <Link className="underline" to="/admin/metadata">
+                    Configure a metadata provider
+                  </Link>
+                  .
+                </>
+              ) : null}
+            </AlertDescription>
+          </Alert>
         ) : null}
 
         {results.data ? (
           <section className="mt-6">
-            <p role="status" aria-live="polite" className="text-sm opacity-80">
+            <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
               {results.data.results.length} result
               {results.data.results.length === 1 ? "" : "s"} ·{" "}
               {results.data.cached ? "served from cache" : "fetched from TMDB"}
             </p>
 
             {results.data.results.length === 0 ? (
-              <p className="mt-4 text-sm">Nothing matched that search.</p>
+              <p className="mt-4 text-sm text-foreground">Nothing matched that search.</p>
             ) : null}
 
             <ul className="mt-4">
               {results.data.results.map((item) => (
-                <li key={item.id} className="mt-2 flex gap-3 rounded bg-harbor-950 p-3">
+                <li key={item.id} className="mt-2 flex gap-3 rounded-xl bg-card p-3">
                   <Poster path={item.posterPath} title={item.title} />
                   <div className="min-w-0">
-                    <p className="text-sm">
+                    <p className="text-sm text-foreground">
                       {item.title}
                       {item.year === null ? "" : ` (${String(item.year)})`} · {item.type}
                     </p>
                     {item.overview === null ? null : (
-                      <p className="mt-1 text-xs opacity-70">{item.overview}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{item.overview}</p>
                     )}
                   </div>
                 </li>
@@ -139,7 +139,7 @@ export function Search(): JSX.Element {
           </section>
         ) : null}
 
-        <p className="mt-8 text-xs opacity-70">{TMDB_ATTRIBUTION}</p>
+        <p className="mt-8 text-xs text-muted-foreground">{TMDB_ATTRIBUTION}</p>
       </div>
     </main>
   );

@@ -2,6 +2,8 @@ import { roleRank } from "@harbor/shared";
 import type { JSX } from "react";
 import { Link } from "react-router";
 import { useCurrentUser, useLogout } from "../auth";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 export function Home(): JSX.Element {
   const { data: user } = useCurrentUser();
@@ -10,29 +12,26 @@ export function Home(): JSX.Element {
 
   return (
     <main className="flex min-h-screen items-center justify-center p-8">
-      <div className="w-full max-w-md rounded-card bg-harbor-900 p-8">
-        <h1 className="text-2xl font-display">Harbor</h1>
-        <p className="mt-3 text-sm opacity-80">
-          Signed in as <span className="font-medium">{user?.username ?? "…"}</span>
+      <Card className="w-full max-w-md p-8">
+        <h1 className="text-2xl font-display text-foreground">Harbor</h1>
+        <p className="mt-3 text-sm text-muted-foreground">
+          Signed in as <span className="font-medium text-foreground">{user?.username ?? "…"}</span>
           {user ? ` (${user.role})` : null}.
         </p>
         <nav className="mt-6" aria-label="Main">
-          <Link
-            className="block rounded bg-harbor-800 p-2 text-center font-medium focus:outline-none focus:ring-2 focus:ring-accent-500"
-            to="/search"
-          >
+          <Link className={buttonVariants({ variant: "secondary", className: "block w-full" })} to="/search">
             Search
           </Link>
           {isAdmin ? (
             <>
               <Link
-                className="mt-2 block rounded bg-harbor-800 p-2 text-center font-medium focus:outline-none focus:ring-2 focus:ring-accent-500"
+                className={buttonVariants({ variant: "secondary", className: "mt-2 block w-full" })}
                 to="/admin/metadata"
               >
                 Metadata settings
               </Link>
               <Link
-                className="mt-2 block rounded bg-harbor-800 p-2 text-center font-medium focus:outline-none focus:ring-2 focus:ring-accent-500"
+                className={buttonVariants({ variant: "secondary", className: "mt-2 block w-full" })}
                 to="/admin/invitations"
               >
                 Invitations
@@ -41,17 +40,18 @@ export function Home(): JSX.Element {
           ) : null}
         </nav>
 
-        <button
+        <Button
           type="button"
+          variant="secondary"
           onClick={() => {
             logout.mutate();
           }}
           disabled={logout.isPending}
-          className="mt-6 w-full rounded bg-harbor-800 p-2 font-medium disabled:opacity-50"
+          className="mt-6 w-full"
         >
           {logout.isPending ? "Signing out…" : "Sign out"}
-        </button>
-      </div>
+        </Button>
+      </Card>
     </main>
   );
 }
