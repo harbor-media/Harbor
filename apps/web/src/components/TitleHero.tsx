@@ -46,7 +46,18 @@ export function TitleBackdrop({ detail }: { detail: TitleDetailResponse }): JSX.
   );
 }
 
-/** Centred title block: name, season, actions, then the summary beneath. */
+/** One clamped height for the hero, so it sits low on the backdrop and the
+ *  page does not jump as the artwork loads -- the same measure the home hero
+ *  uses. */
+const HERO_HEIGHT = "h-[clamp(26rem,64vh,40rem)]";
+
+/**
+ * Left-aligned cinematic hero: a type label, the title, meta, genres, overview,
+ * and actions in one block anchored at the bottom of the backdrop. Centring the
+ * title while left-aligning the overview read as two designs; this is one, and
+ * it matches the home hero so a title page and the home screen feel like one
+ * product.
+ */
 export function TitleHeader({
   detail,
   seasonLabel,
@@ -55,54 +66,28 @@ export function TitleHeader({
   seasonLabel: string | null;
 }): JSX.Element {
   const runtime = detail.runtime === null ? null : `${String(detail.runtime)} min`;
-  const meta = metaLine([detail.year, runtime, detail.type === "movie" ? "Film" : "Series"]);
+  // The type ("Film"/"Series") is now the label above the title, so the meta
+  // line carries only year and runtime.
+  const meta = metaLine([detail.year, runtime]);
+  // The season name, on a season view, stands in for the type label.
+  const label = seasonLabel ?? (detail.type === "movie" ? "Film" : "Series");
 
   return (
-    <div>
-      <div className="flex flex-col items-center pt-16 text-center">
-        <h1 className="font-display text-5xl leading-tight tracking-tight sm:text-6xl">
-          {detail.title}
-        </h1>
+    <div className={`flex ${HERO_HEIGHT} max-w-2xl flex-col justify-end`}>
+      <p className="font-mono text-xs tracking-widest text-muted-foreground uppercase">{label}</p>
 
-        {detail.originalTitle !== null && detail.originalTitle !== detail.title ? (
-          <p className="mt-2 text-sm text-muted-foreground">{detail.originalTitle}</p>
-        ) : null}
+      <h1 className="mt-3 font-display text-5xl leading-tight tracking-tight sm:text-6xl">
+        {detail.title}
+      </h1>
 
-        {seasonLabel === null ? null : (
-          <p className="mt-3 font-display text-2xl text-muted-foreground">{seasonLabel}</p>
-        )}
+      {detail.originalTitle !== null && detail.originalTitle !== detail.title ? (
+        <p className="mt-2 text-sm text-muted-foreground">{detail.originalTitle}</p>
+      ) : null}
 
+      {meta === "" ? null : (
         <p className="mt-3 font-mono text-xs tracking-widest text-muted-foreground uppercase">
           {meta}
         </p>
-
-        <div className="mt-8 flex items-center gap-3">
-          {/* Visibly inert rather than dead handlers: playback arrives in
-              Phase 5 and the library in Phase 4. A button that silently does
-              nothing reads as a bug; a disabled one with a reason reads as a
-              roadmap. */}
-          {/* The explanation sits on a wrapping span: React Aria buttons do
-              not forward a title attribute, and a disabled control gives no
-              hint on its own about why. */}
-          <span title="Playback arrives in a later phase">
-            <Button size="lg" className="rounded-full px-8" isDisabled>
-              {/* An icon, not a bare U+25B6: the glyph lands in the button's
-                  accessible name, which a screen reader reads out as "black
-                  right-pointing triangle, Play". */}
-              <PlayIcon className="size-4" aria-hidden="true" />
-              Play
-            </Button>
-          </span>
-          <span title="The library arrives in a later phase">
-            <Button variant="secondary" size="lg" className="rounded-full" isDisabled>
-              Watchlist
-            </Button>
-          </span>
-        </div>
-      </div>
-
-      {detail.overview === null ? null : (
-        <p className="mt-14 max-w-4xl text-sm text-muted-foreground">{detail.overview}</p>
       )}
 
       {detail.genres.length > 0 ? (
@@ -114,18 +99,43 @@ export function TitleHeader({
           ))}
         </div>
       ) : null}
+
+      {detail.overview === null ? null : (
+        <p className="mt-4 line-clamp-3 text-sm text-muted-foreground">{detail.overview}</p>
+      )}
+
+      <div className="mt-6 flex items-center gap-3">
+        {/* Visibly inert rather than dead handlers: playback arrives in Phase 5
+            and the library in Phase 4. A button that silently does nothing reads
+            as a bug; a disabled one with a reason reads as a roadmap. The
+            explanation sits on a wrapping span because React Aria buttons do not
+            forward a title attribute, and the span keeps it keyboard-reachable. */}
+        <span title="Playback arrives in a later phase">
+          <Button size="lg" className="rounded-full px-8" isDisabled>
+            {/* An icon, not a bare U+25B6: the glyph would land in the button's
+                accessible name as "black right-pointing triangle, Play". */}
+            <PlayIcon className="size-4" aria-hidden="true" />
+            Play
+          </Button>
+        </span>
+        <span title="The library arrives in a later phase">
+          <Button variant="secondary" size="lg" className="rounded-full" isDisabled>
+            Watchlist
+          </Button>
+        </span>
+      </div>
     </div>
   );
 }
 
-/** Reserves the header's shape so the page does not jump when data arrives. */
+/** Reserves the hero's shape so the page does not jump when data arrives. */
 export function TitleHeaderSkeleton(): JSX.Element {
   return (
-    <div aria-hidden="true" className="flex flex-col items-center pt-16">
-      <Skeleton className="h-14 w-2/3 max-w-xl" />
-      <Skeleton className="mt-4 h-4 w-40" />
-      <Skeleton className="mt-8 h-11 w-64 rounded-full" />
-      <Skeleton className="mt-14 h-16 w-full max-w-4xl" />
+    <div aria-hidden="true" className={`flex ${HERO_HEIGHT} max-w-2xl flex-col justify-end`}>
+      <Skeleton className="h-3 w-16" />
+      <Skeleton className="mt-3 h-14 w-2/3" />
+      <Skeleton className="mt-4 h-16 w-full" />
+      <Skeleton className="mt-6 h-11 w-64 rounded-full" />
     </div>
   );
 }

@@ -47,7 +47,7 @@ export function Title(): JSX.Element {
     detail.error instanceof ApiError && detail.error.code === "METADATA_NOT_CONFIGURED";
 
   return (
-    <main className="relative min-h-screen px-8 pb-16">
+    <main className="relative px-8 pb-16 pt-8">
       {detail.data ? <TitleBackdrop detail={detail.data} /> : null}
 
       <div className="mx-auto w-full max-w-7xl">
