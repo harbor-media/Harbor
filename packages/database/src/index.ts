@@ -13,3 +13,5 @@ export * from "./sessions.js";
 export * from "./setup.js";
 export * from "./titles.js";
 export * from "./users.js";
+
+export * from "./genres.js";
