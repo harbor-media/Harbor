@@ -1,5 +1,5 @@
 import type { NormalizedEpisode, NormalizedSeason, NormalizedTitle } from "@harbor/database";
-import type { CatalogKind } from "@harbor/shared";
+import type { CatalogKind, DiscoverType, Genre } from "@harbor/shared";
 
 export type MetadataFailureKind = "unauthorized" | "unavailable";
 
@@ -29,6 +29,12 @@ export interface ProviderTitleDetail {
   genres: string[];
   /** Always empty for a movie, so callers need no type test. */
   seasons: NormalizedSeason[];
+}
+
+export interface DiscoverResult {
+  titles: NormalizedTitle[];
+  page: number;
+  totalPages: number;
 }
 
 /**
@@ -68,4 +74,18 @@ export interface MetadataProvider {
     language: string,
     signal: AbortSignal,
   ): Promise<NormalizedTitle[]>;
+  /**
+   * Whether this provider can browse by genre. A capability flag, not a
+   * throwing method: a provider that cannot discover sets this false and
+   * Harbor hides the feature rather than erroring.
+   */
+  readonly supportsDiscover: boolean;
+  getGenres(type: DiscoverType, language: string, signal: AbortSignal): Promise<Genre[]>;
+  discoverByGenre(
+    type: DiscoverType,
+    genreId: string,
+    page: number,
+    language: string,
+    signal: AbortSignal,
+  ): Promise<DiscoverResult>;
 }

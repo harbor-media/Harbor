@@ -1,8 +1,9 @@
 import type { NormalizedEpisode, NormalizedTitle } from "@harbor/database";
-import type { CatalogKind } from "@harbor/shared";
+import type { CatalogKind, DiscoverType, Genre } from "@harbor/shared";
 import { z } from "zod";
 import {
   MetadataProviderError,
+  type DiscoverResult,
   type MetadataProvider,
   type MetadataSearchQuery,
   type ProviderTitleDetail,
@@ -191,6 +192,24 @@ const CATALOG_ENDPOINTS: Record<CatalogKind, { path: string; mediaType?: "movie"
 
 const CATALOG_KINDS_SUPPORTED = Object.keys(CATALOG_ENDPOINTS) as CatalogKind[];
 
+// series -> tv is the only mapping TMDB needs; movie is identical.
+const DISCOVER_TMDB_TYPE: Record<DiscoverType, "movie" | "tv"> = {
+  movie: "movie",
+  series: "tv",
+};
+
+// The genre list is parsed permissively at the outer level, then each entry
+// individually -- so one malformed entry is dropped rather than failing the
+// whole list, exactly as search results are handled.
+const genreListSchema = z.object({ genres: z.array(z.unknown()).nullish() });
+const genreItemSchema = z.object({ id: z.number(), name: z.string() });
+
+const discoverResponseSchema = z.object({
+  page: z.number(),
+  total_pages: z.number(),
+  results: z.array(z.unknown()).nullish(),
+});
+
 export interface TmdbProviderOptions {
   baseUrl?: string;
   fetchImpl?: typeof fetch;
@@ -278,6 +297,48 @@ export function createTmdbProvider(
         const normalized = normalize(withType);
         return normalized ? [normalized] : [];
       });
+    },
+
+    supportsDiscover: true,
+
+    async getGenres(type: DiscoverType, language: string, signal: AbortSignal): Promise<Genre[]> {
+      const payload = parseOrUnavailable(
+        genreListSchema,
+        await call(`/genre/${DISCOVER_TMDB_TYPE[type]}/list`, new URLSearchParams({ language }), signal),
+      );
+      return (payload.genres ?? []).flatMap((raw) => {
+        const g = genreItemSchema.safeParse(raw);
+        // TMDB genre ids are numbers; Harbor carries them as strings.
+        return g.success ? [{ id: String(g.data.id), name: g.data.name }] : [];
+      });
+    },
+
+    async discoverByGenre(
+      type: DiscoverType,
+      genreId: string,
+      page: number,
+      language: string,
+      signal: AbortSignal,
+    ): Promise<DiscoverResult> {
+      const params = new URLSearchParams({
+        language,
+        with_genres: genreId,
+        page: String(page),
+        include_adult: "false",
+      });
+      const payload = parseOrUnavailable(
+        discoverResponseSchema,
+        await call(`/discover/${DISCOVER_TMDB_TYPE[type]}`, params, signal),
+      );
+      // /discover/* omits media_type; inject it so normalize() keeps the rows.
+      const mediaType = DISCOVER_TMDB_TYPE[type];
+      const titles = (payload.results ?? []).flatMap((raw) => {
+        const item = searchItemSchema.safeParse(raw);
+        if (!item.success) return [];
+        const normalized = normalize({ ...item.data, media_type: mediaType });
+        return normalized ? [normalized] : [];
+      });
+      return { titles, page: payload.page, totalPages: payload.total_pages };
     },
 
     async validateConfiguration(signal: AbortSignal): Promise<void> {

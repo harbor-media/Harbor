@@ -119,6 +119,9 @@ function fakeProvider(calls: Calls): MetadataProvider {
     },
     catalogs: ["trending", "popular-movies", "popular-series", "new-releases"],
     getCatalog: async () => [],
+    supportsDiscover: true,
+    getGenres: async () => [],
+    discoverByGenre: async () => ({ titles: [], page: 1, totalPages: 1 }),
   };
 }
 
@@ -135,6 +138,9 @@ function failing(kind: "unavailable" | "unauthorized"): MetadataProvider {
     getSeason: async () => boom(),
     catalogs: ["trending", "popular-movies", "popular-series", "new-releases"],
     getCatalog: async () => boom(),
+    supportsDiscover: true,
+    getGenres: async () => boom(),
+    discoverByGenre: async () => boom(),
   };
 }
 
