@@ -67,6 +67,18 @@ test("a search result opens a real title page", async ({ page }) => {
   // endpoint ran rather than the page reusing the search result.
   await expect(page.getByText("Science Fiction")).toBeVisible();
   await expect(page.getByText("1h 57m")).toBeVisible();
+
+  // Enrichment: the logo renders in the heading, the rating shows in the meta
+  // line, and the details table carries the director and studio.
+  const heroLogo = page.getByRole("heading", { level: 1 }).locator("img");
+  await expect
+    .poll(async () =>
+      heroLogo.evaluate((img) => (img as unknown as { naturalWidth: number }).naturalWidth),
+    )
+    .toBeGreaterThan(0);
+  await expect(page.getByText(/★\s*8\.1/)).toBeVisible();
+  await expect(page.getByText("Ridley Scott")).toBeVisible();
+  await expect(page.getByText("Warner Bros.")).toBeVisible();
 });
 
 test("a series page shows season tabs and switching changes the episodes", async ({ page }) => {

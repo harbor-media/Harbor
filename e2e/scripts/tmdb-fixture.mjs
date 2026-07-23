@@ -80,6 +80,18 @@ const MOVIE_DETAIL = {
   backdrop_path: "/backdrop.jpg",
   runtime: 117,
   genres: [{ id: 878, name: "Science Fiction" }, { id: 53, name: "Thriller" }],
+  tagline: "More than human.",
+  vote_average: 8.1,
+  production_companies: [{ name: "Warner Bros." }],
+  credits: {
+    crew: [
+      { job: "Director", name: "Ridley Scott" },
+      { job: "Screenplay", name: "Hampton Fancher" },
+    ],
+  },
+  // The logo file_path reuses /backdrop.jpg, which the image fixture already
+  // serves, so the naturalWidth assertion has real bytes.
+  images: { logos: [{ file_path: "/backdrop.jpg", iso_639_1: "en" }] },
 };
 
 const SERIES_DETAIL = {

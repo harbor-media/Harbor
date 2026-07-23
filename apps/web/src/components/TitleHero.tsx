@@ -1,7 +1,6 @@
 import type { TitleDetailResponse } from "@harbor/shared";
 import type { JSX } from "react";
 import { PlayIcon } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { imageUrl } from "../images";
@@ -133,8 +132,9 @@ export function TitleHero({
         </div>
       </div>
 
-      {/* Overview and genres, bottom-left. */}
-      {detail.tagline !== null || detail.overview !== null || detail.genres.length > 0 ? (
+      {/* Tagline and overview, bottom-left. Genres live in the details table
+          below the hero (TitleDetails), not here, so they are not duplicated. */}
+      {detail.tagline !== null || detail.overview !== null ? (
         <div className="relative z-10 max-w-2xl px-8 pb-10">
           {detail.tagline === null ? null : (
             <p className="mb-2 text-sm text-muted-foreground italic">{detail.tagline}</p>
@@ -142,15 +142,6 @@ export function TitleHero({
           {detail.overview === null ? null : (
             <p className="text-sm text-muted-foreground">{detail.overview}</p>
           )}
-          {detail.genres.length > 0 ? (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {detail.genres.map((genre) => (
-                <Badge key={genre} variant="secondary">
-                  {genre}
-                </Badge>
-              ))}
-            </div>
-          ) : null}
         </div>
       ) : null}
     </section>
