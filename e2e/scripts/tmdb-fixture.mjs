@@ -211,6 +211,33 @@ const server = createServer((req, res) => {
     return;
   }
 
+  if (url.pathname === "/genre/movie/list") {
+    send(res, 200, { genres: [{ id: 28, name: "Action" }, { id: 878, name: "Science Fiction" }] });
+    return;
+  }
+  if (url.pathname === "/genre/tv/list") {
+    send(res, 200, { genres: [{ id: 18, name: "Drama" }] });
+    return;
+  }
+  if (url.pathname === "/discover/movie") {
+    // Two pages, so Load more is exercised. media_type omitted, as TMDB does.
+    const page = Number(url.searchParams.get("page") ?? "1");
+    const results =
+      page === 1
+        ? [{ id: 78, title: "Blade Runner", poster_path: "/poster.jpg", release_date: "1982-06-25" }]
+        : [{ id: 680, title: "Pulp Fiction", poster_path: "/pf.jpg", release_date: "1994-10-14" }];
+    send(res, 200, { page, total_pages: 2, results });
+    return;
+  }
+  if (url.pathname === "/discover/tv") {
+    send(res, 200, {
+      page: 1,
+      total_pages: 1,
+      results: [{ id: 1622, name: "Supernatural", poster_path: "/sn.jpg", first_air_date: "2005-09-13" }],
+    });
+    return;
+  }
+
   send(res, 404, { status_message: "Not found" });
 });
 

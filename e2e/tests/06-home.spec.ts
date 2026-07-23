@@ -101,7 +101,9 @@ test("row scroll buttons reflect position", async () => {
 test("the shell reaches search and marks unbuilt destinations", async () => {
   await page.goto("/home");
 
-  await expect(page.getByRole("button", { name: /discover/i })).toHaveAttribute(
+  // Library is still unbuilt (Phase 4), so it stays a disabled "Soon" button.
+  // Discover went live in 3c-2c and is a real link now.
+  await expect(page.getByRole("button", { name: /library/i })).toHaveAttribute(
     "aria-disabled",
     "true",
   );
