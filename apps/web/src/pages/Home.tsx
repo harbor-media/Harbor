@@ -43,7 +43,10 @@ function Hero({ featured }: { featured: TitleCard }): JSX.Element {
 
   return (
     <section className={`relative flex ${HERO_HEIGHT} flex-col justify-end overflow-hidden`}>
-      <div aria-hidden="true" className="absolute inset-0 -z-10">
+      {/* Plain absolute layer, no negative z-index: the backdrop paints above
+          the page canvas and the content, being `relative` below, paints above
+          the backdrop. Nothing can hide behind the root background. */}
+      <div aria-hidden="true" className="absolute inset-0">
         {src === null ? (
           <div className="h-full w-full bg-card" />
         ) : (
@@ -57,13 +60,15 @@ function Hero({ featured }: { featured: TitleCard }): JSX.Element {
             }
           />
         )}
-        {/* Left-darkening for legibility, plus a fade to the canvas so the rows
-            below meet the artwork softly rather than at a hard edge. */}
-        <div className="absolute inset-0 bg-gradient-to-r from-background/95 via-background/50 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/30 to-transparent" />
+        {/* Gradients kept light so most of the backdrop stays visible even
+            when the artwork is dark: the bottom fades to the canvas only near
+            the very edge so the rows meet it softly, and the left darkens just
+            enough under the text to keep it legible. */}
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-transparent to-transparent" />
       </div>
 
-      <div className="max-w-2xl px-6 pb-12">
+      <div className="relative max-w-2xl px-6 pb-12">
         <p className="font-mono text-xs tracking-widest text-muted-foreground uppercase">Featured</p>
         <h1 className="mt-3 font-display text-5xl leading-tight tracking-tight sm:text-6xl">
           {featured.title}
