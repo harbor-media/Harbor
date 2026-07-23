@@ -182,6 +182,19 @@ describe("fetchTitleDetail", () => {
     expect(result.seasons.map((s) => s.seasonNumber)).toEqual([1, 2]);
   });
 
+  it("returns the enrichment fields on the response", async () => {
+    await configure();
+    const id = await seedSeries();
+    const result = await fetchTitleDetail(deps(fakeProvider({ detail: 0, season: 0 })), id);
+
+    expect(result.tagline).toBe(DETAIL.tagline);
+    expect(result.rating).toBe(DETAIL.rating);
+    expect(result.logoPath).toBe(DETAIL.logoPath);
+    expect(result.director).toBe(DETAIL.director);
+    expect(result.writers).toEqual(DETAIL.writers);
+    expect(result.studios).toEqual(DETAIL.studios);
+  });
+
   // The load-bearing cache assertion: it counts provider calls. Asserting
   // only that data came back would pass whether or not caching works.
   it("serves a second request without contacting the provider", async () => {

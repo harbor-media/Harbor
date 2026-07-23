@@ -261,6 +261,13 @@ export interface TitleDetailResponse {
   backdropPath: string | null;
   runtime: number | null;
   genres: string[];
+  tagline: string | null;
+  /** vote_average, or null when the provider has no votes. */
+  rating: number | null;
+  logoPath: string | null;
+  director: string | null;
+  writers: string[];
+  studios: string[];
   /**
    * Empty for movies. Season summaries only -- episodes come from the season
    * endpoint, so drawing a tab strip does not fetch an entire show.

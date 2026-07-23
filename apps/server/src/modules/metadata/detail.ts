@@ -62,6 +62,12 @@ function toResponse(
     backdropPath: title.backdropPath,
     runtime: title.runtime,
     genres: title.genres,
+    tagline: title.tagline,
+    rating: title.rating,
+    logoPath: title.logoPath,
+    director: title.director,
+    writers: title.writers,
+    studios: title.studios,
     seasons: seasons.map(toSummary),
     cached,
   };
