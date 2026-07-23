@@ -287,3 +287,18 @@ export const catalogEntries = pgTable(
   },
   (table) => [primaryKey({ columns: [table.kind, table.position] })],
 );
+
+/**
+ * One row per discover type, holding that type's whole genre list as JSON.
+ *
+ * Genre lists are tiny and near-immutable and read on every Discover load --
+ * an ideal thing to cache. Discover *results* are deliberately not cached
+ * (their key space is huge and cold); only this list is.
+ */
+export const genreCache = pgTable("genre_cache", {
+  // 'movie' | 'series' -- kept a plain text column so the database layer stays
+  // agnostic about the vocabulary, exactly as catalog_rows.kind is.
+  type: text("type").primaryKey(),
+  genres: jsonb("genres").$type<{ id: string; name: string }[]>().notNull(),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(),
+});
