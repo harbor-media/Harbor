@@ -4,7 +4,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ApiError, describeMetadataError } from "../metadata";
 import { EpisodeList } from "../components/EpisodeList";
 import { SeasonSelector } from "../components/SeasonSelector";
-import { TitleBackdrop, TitleHeader, TitleHeaderSkeleton } from "../components/TitleHero";
+import { TitleHero, TitleHeroSkeleton } from "../components/TitleHero";
 import { useSeasonDetail, useTitleDetail } from "../titles";
 
 const TMDB_ATTRIBUTION =
@@ -47,12 +47,10 @@ export function Title(): JSX.Element {
     detail.error instanceof ApiError && detail.error.code === "METADATA_NOT_CONFIGURED";
 
   return (
-    <main className="relative px-8 pb-16 pt-8">
-      {detail.data ? <TitleBackdrop detail={detail.data} /> : null}
-
-      <div className="mx-auto w-full max-w-7xl">
-        {detail.isError ? (
-          <Alert variant="destructive" aria-live="assertive" className="mt-8">
+    <main className="relative pb-16">
+      {detail.isError ? (
+        <div className="mx-auto w-full max-w-7xl px-8 pt-8">
+          <Alert variant="destructive" aria-live="assertive">
             <AlertDescription>
               {describeMetadataError(detail.error)}
               {notConfigured ? (
@@ -66,11 +64,13 @@ export function Title(): JSX.Element {
               ) : null}
             </AlertDescription>
           </Alert>
-        ) : null}
+        </div>
+      ) : null}
 
-        {detail.isPending ? <TitleHeaderSkeleton /> : null}
-        {detail.data ? <TitleHeader detail={detail.data} seasonLabel={seasonLabel} /> : null}
+      {detail.isPending ? <TitleHeroSkeleton /> : null}
+      {detail.data ? <TitleHero detail={detail.data} seasonLabel={seasonLabel} /> : null}
 
+      <div className="mx-auto w-full max-w-7xl px-8">
         {detail.data && isSeries && seasons.length > 0 ? (
           <section className="mt-12">
             <SeasonSelector titleId={detail.data.id} seasons={seasons} active={active} />

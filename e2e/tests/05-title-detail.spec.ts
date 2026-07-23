@@ -66,7 +66,7 @@ test("a search result opens a real title page", async ({ page }) => {
   // Genres come from the detail payload, so their presence proves the detail
   // endpoint ran rather than the page reusing the search result.
   await expect(page.getByText("Science Fiction")).toBeVisible();
-  await expect(page.getByText("117 min")).toBeVisible();
+  await expect(page.getByText("1h 57m")).toBeVisible();
 });
 
 test("a series page shows season tabs and switching changes the episodes", async ({ page }) => {
