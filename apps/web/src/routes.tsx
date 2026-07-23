@@ -4,6 +4,7 @@ import { createBrowserRouter, Navigate, Outlet, useLocation } from "react-router
 import { useInstallationState } from "./api";
 import { useCurrentUser } from "./auth";
 import { AppShell } from "./components/AppShell";
+import { Discover } from "./pages/Discover";
 import { AdminMetadata } from "./pages/AdminMetadata";
 import { Home } from "./pages/Home";
 import { Invite } from "./pages/Invite";
@@ -81,6 +82,7 @@ export const router = createBrowserRouter([
         Component: AppShell,
         children: [
           { path: "home", Component: Home },
+          { path: "discover", Component: Discover },
           { path: "search", Component: Search },
           { path: "movie/:id", Component: Title },
           { path: "series/:id", Component: Title },

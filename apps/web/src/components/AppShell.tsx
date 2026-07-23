@@ -64,7 +64,9 @@ export function AppShell(): JSX.Element {
           <NavLink to="/home" className={linkClass}>
             Home
           </NavLink>
-          <ComingSoon label="Discover" />
+          <NavLink to="/discover" className={linkClass}>
+            Discover
+          </NavLink>
           <ComingSoon label="Library" />
           <div className="flex-1" />
           <NavLink to="/search" className={linkClass}>
