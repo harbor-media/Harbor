@@ -70,6 +70,19 @@ const detailSchema = z.object({
   episode_run_time: z.array(z.number()).nullish(),
   genres: z.array(genreSchema).nullish(),
   seasons: z.array(seasonSummarySchema).nullish(),
+  tagline: z.string().nullish(),
+  vote_average: z.number().nullish(),
+  production_companies: z.array(z.object({ name: z.string() })).nullish(),
+  credits: z
+    .object({ crew: z.array(z.object({ job: z.string(), name: z.string() })).nullish() })
+    .nullish(),
+  images: z
+    .object({
+      logos: z
+        .array(z.object({ file_path: z.string(), iso_639_1: z.string().nullish() }))
+        .nullish(),
+    })
+    .nullish(),
 });
 
 const episodeSchema = z.object({
@@ -141,6 +154,15 @@ function textOrNull(value: string | null | undefined): string | null {
   return value === undefined || value === null || value === "" ? null : value;
 }
 
+const WRITER_JOBS = new Set(["Writer", "Screenplay", "Story"]);
+
+/** English logo if there is one, else the first, else null. TMDB returns
+ *  logos in several languages; the English one is the right default here. */
+function pickLogo(logos: { file_path: string; iso_639_1?: string | null }[]): string | null {
+  const en = logos.find((l) => l.iso_639_1 === "en");
+  return (en ?? logos[0])?.file_path ?? null;
+}
+
 function toDetail(
   payload: z.infer<typeof detailSchema>,
   isMovie: boolean,
@@ -164,6 +186,19 @@ function toDetail(
     // episode lengths, whose first entry is the representative one.
     runtime: isMovie ? (payload.runtime ?? null) : (runTimes[0] ?? null),
     genres: (payload.genres ?? []).map((g) => g.name),
+    tagline: textOrNull(payload.tagline),
+    // TMDB uses 0.0 for "no votes"; a "star 0" badge would misread that as a
+    // zero score, so 0 becomes null.
+    rating:
+      payload.vote_average == null || payload.vote_average === 0 ? null : payload.vote_average,
+    logoPath: pickLogo(payload.images?.logos ?? []),
+    director: (payload.credits?.crew ?? []).find((c) => c.job === "Director")?.name ?? null,
+    writers: [
+      ...new Set(
+        (payload.credits?.crew ?? []).filter((c) => WRITER_JOBS.has(c.job)).map((c) => c.name),
+      ),
+    ],
+    studios: (payload.production_companies ?? []).map((c) => c.name),
     seasons: isMovie
       ? []
       : seasonList.map((sn) => ({
@@ -375,7 +410,7 @@ export function createTmdbProvider(
         detailSchema,
         await call(
           `/movie/${encodeURIComponent(externalId)}`,
-          new URLSearchParams({ language }),
+          new URLSearchParams({ language, append_to_response: "credits,images" }),
           signal,
         ),
       );
@@ -391,7 +426,7 @@ export function createTmdbProvider(
         detailSchema,
         await call(
           `/tv/${encodeURIComponent(externalId)}`,
-          new URLSearchParams({ language }),
+          new URLSearchParams({ language, append_to_response: "credits,images" }),
           signal,
         ),
       );

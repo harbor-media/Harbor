@@ -84,6 +84,12 @@ const DETAIL = {
   backdropPath: "/bd.jpg",
   runtime: 44,
   genres: ["Drama"],
+  tagline: "Saving people, hunting things.",
+  rating: 8.3,
+  logoPath: "/logo.png",
+  director: "Eric Kripke",
+  writers: ["Eric Kripke"],
+  studios: ["Warner Bros. Television"],
   seasons: [
     { seasonNumber: 1, name: "Season 1", overview: null, posterPath: null, episodeCount: 2, airDate: null },
     { seasonNumber: 2, name: "Season 2", overview: null, posterPath: null, episodeCount: 1, airDate: null },

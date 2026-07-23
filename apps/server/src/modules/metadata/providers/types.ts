@@ -27,6 +27,13 @@ export interface ProviderTitleDetail {
   backdropPath: string | null;
   runtime: number | null;
   genres: string[];
+  tagline: string | null;
+  /** vote_average, but null when TMDB reports 0 (its "no votes" value). */
+  rating: number | null;
+  logoPath: string | null;
+  director: string | null;
+  writers: string[];
+  studios: string[];
   /** Always empty for a movie, so callers need no type test. */
   seasons: NormalizedSeason[];
 }

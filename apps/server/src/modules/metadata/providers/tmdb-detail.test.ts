@@ -241,3 +241,76 @@ describe("provider payload validation", () => {
     expect(detail.runtime).toBe(117);
   });
 });
+
+describe("detail enrichment", () => {
+  const enriched = {
+    ...MOVIE,
+    tagline: "More than meets the eye.",
+    vote_average: 6.4,
+    production_companies: [{ name: "Wayans Bros." }, { name: "Miramax" }],
+    credits: {
+      crew: [
+        { job: "Director", name: "Michael Tiddes" },
+        { job: "Screenplay", name: "Rick Alvarez" },
+        { job: "Writer", name: "Rick Alvarez" },
+        { job: "Story", name: "Marlon Wayans" },
+        { job: "Editor", name: "Someone Else" },
+      ],
+    },
+    images: {
+      logos: [
+        { file_path: "/xx-fr.png", iso_639_1: "fr" },
+        { file_path: "/logo-en.png", iso_639_1: "en" },
+      ],
+    },
+  };
+
+  function providerFor(body: unknown) {
+    return createTmdbProvider("key", { fetchImpl: fake(async () => json(body)) });
+  }
+
+  it("pulls tagline, studios, director and deduped writers", async () => {
+    const d = await providerFor(enriched).getMovie("78", "en-US", SIGNAL());
+    expect(d.tagline).toBe("More than meets the eye.");
+    expect(d.studios).toEqual(["Wayans Bros.", "Miramax"]);
+    expect(d.director).toBe("Michael Tiddes");
+    expect(d.writers).toEqual(["Rick Alvarez", "Marlon Wayans"]);
+  });
+
+  it("prefers the English logo over an earlier non-English one", async () => {
+    const d = await providerFor(enriched).getMovie("78", "en-US", SIGNAL());
+    expect(d.logoPath).toBe("/logo-en.png");
+  });
+
+  it("treats a vote_average of 0 as no rating", async () => {
+    const d = await providerFor({ ...enriched, vote_average: 0 }).getMovie("78", "en-US", SIGNAL());
+    expect(d.rating).toBeNull();
+  });
+
+  it("passes a real vote_average through", async () => {
+    const d = await providerFor(enriched).getMovie("78", "en-US", SIGNAL());
+    expect(d.rating).toBe(6.4);
+  });
+
+  it("parses a detail body with no credits, images, or tagline", async () => {
+    const d = await providerFor(MOVIE).getMovie("78", "en-US", SIGNAL());
+    expect(d.tagline).toBeNull();
+    expect(d.logoPath).toBeNull();
+    expect(d.director).toBeNull();
+    expect(d.writers).toEqual([]);
+    expect(d.studios).toEqual([]);
+    expect(d.rating).toBeNull();
+  });
+
+  it("requests credits and images in one call", async () => {
+    const urls: string[] = [];
+    const provider = createTmdbProvider("key", {
+      fetchImpl: ((url: string) => {
+        urls.push(url);
+        return Promise.resolve(json(MOVIE));
+      }) as unknown as typeof fetch,
+    });
+    await provider.getMovie("78", "en-US", SIGNAL());
+    expect(urls[0]).toContain("append_to_response=credits%2Cimages");
+  });
+});
