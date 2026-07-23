@@ -64,6 +64,13 @@
       "when": 1784809108037,
       "tag": "0008_square_havok",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1784834433919,
+      "tag": "0009_wise_firebird",
+      "breakpoints": true
     }
   ]
 }

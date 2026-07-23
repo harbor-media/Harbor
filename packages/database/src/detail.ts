@@ -24,6 +24,12 @@ export interface NormalizedEpisode {
 export interface StoredTitleDetail extends StoredTitle {
   runtime: number | null;
   genres: string[];
+  tagline: string | null;
+  rating: number | null;
+  logoPath: string | null;
+  director: string | null;
+  writers: string[];
+  studios: string[];
   detailFetchedAt: Date | null;
 }
 
@@ -35,6 +41,12 @@ export interface TitleDetailUpdate {
   backdropPath: string | null;
   runtime: number | null;
   genres: string[];
+  tagline: string | null;
+  rating: number | null;
+  logoPath: string | null;
+  director: string | null;
+  writers: string[];
+  studios: string[];
 }
 
 export async function getTitleDetail(db: Db, id: string): Promise<StoredTitleDetail | null> {
@@ -63,6 +75,12 @@ export async function getTitleDetail(db: Db, id: string): Promise<StoredTitleDet
     backdropPath: row.backdropPath,
     runtime: row.runtime,
     genres: row.genres,
+    tagline: row.tagline,
+    rating: row.rating,
+    logoPath: row.logoPath,
+    director: row.director,
+    writers: row.writers,
+    studios: row.studios,
     detailFetchedAt: row.detailFetchedAt,
     externalIds,
   };
@@ -145,6 +163,12 @@ export async function saveTitleDetail(
         backdropPath: update.backdropPath,
         runtime: update.runtime,
         genres: update.genres,
+        tagline: update.tagline,
+        rating: update.rating,
+        logoPath: update.logoPath,
+        director: update.director,
+        writers: update.writers,
+        studios: update.studios,
         detailFetchedAt: now,
         fetchedAt: now,
       })

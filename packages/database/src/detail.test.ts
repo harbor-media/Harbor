@@ -74,6 +74,12 @@ async function saveSeasons(
       backdropPath: null,
       runtime: null,
       genres: [],
+      tagline: null,
+      rating: null,
+      logoPath: null,
+      director: null,
+      writers: [],
+      studios: [],
     },
     items,
     new Date(),
@@ -128,6 +134,12 @@ describe("saveTitleDetail", () => {
         backdropPath: "/bd.jpg",
         runtime: 44,
         genres: ["Drama", "Mystery"],
+        tagline: null,
+        rating: null,
+        logoPath: null,
+        director: null,
+        writers: [],
+        studios: [],
       },
       [],
       new Date(),
@@ -139,6 +151,39 @@ describe("saveTitleDetail", () => {
     expect(row?.overview).toBe("Updated overview.");
     expect(row?.backdropPath).toBe("/bd.jpg");
     expect(row?.detailFetchedAt).not.toBeNull();
+  });
+
+  it("round-trips the enrichment fields", async () => {
+    const id = await seedTitle();
+    await saveTitleDetail(
+      db,
+      id,
+      {
+        originalTitle: "Blade Runner",
+        year: 1982,
+        overview: "x",
+        posterPath: null,
+        backdropPath: null,
+        runtime: 117,
+        genres: ["Science Fiction"],
+        tagline: "More than meets the eye.",
+        rating: 6.4,
+        logoPath: "/logo.png",
+        director: "Ridley Scott",
+        writers: ["Hampton Fancher", "David Peoples"],
+        studios: ["Warner Bros."],
+      },
+      [],
+      new Date(),
+    );
+
+    const row = await getTitleDetail(db, id);
+    expect(row?.tagline).toBe("More than meets the eye.");
+    expect(row?.rating).toBe(6.4);
+    expect(row?.logoPath).toBe("/logo.png");
+    expect(row?.director).toBe("Ridley Scott");
+    expect(row?.writers).toEqual(["Hampton Fancher", "David Peoples"]);
+    expect(row?.studios).toEqual(["Warner Bros."]);
   });
 });
 

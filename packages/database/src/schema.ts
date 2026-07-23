@@ -9,6 +9,7 @@ import {
   pgEnum,
   pgTable,
   primaryKey,
+  real,
   text,
   timestamp,
   uniqueIndex,
@@ -166,6 +167,12 @@ export const titles = pgTable(
     backdropPath: text("backdrop_path"),
     runtime: integer("runtime"),
     genres: jsonb("genres").$type<string[]>().notNull().default([]),
+    tagline: text("tagline"),
+    rating: real("rating"),
+    logoPath: text("logo_path"),
+    director: text("director"),
+    writers: jsonb("writers").$type<string[]>().notNull().default([]),
+    studios: jsonb("studios").$type<string[]>().notNull().default([]),
     // Distinct from fetchedAt on purpose. A row created by search holds only
     // summary fields; without this there is no way to tell "Harbor knows this
     // title exists" from "Harbor has the whole title", and the detail page
