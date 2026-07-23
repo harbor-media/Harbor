@@ -7,6 +7,18 @@ can judge urgency without re-deriving it.
 This file exists because these had previously been tracked only in
 conversation, where they do not survive.
 
+## From the title-page hero redesign
+
+- **Title logo, tagline, and rating are not shown.** The Jellyfin-style hero
+  ships with the data Harbor stores today (backdrop, title text, year, runtime,
+  genres, overview). Full parity wants three more provider-sourced fields, all
+  in the TMDB detail payload but not yet stored: the title **logo image**
+  (TMDB `/images` logos -> a `logoPath`, proxied like posters/backdrops -> the
+  "SCARY MOVIE" treatment), the **tagline** (`tagline`), and the **rating**
+  (`vote_average`). The logo is the biggest piece (provider + schema migration +
+  image proxy + detail payload); tagline and rating are small additions to the
+  same three. A deliberate follow-up, chosen as "layout now, data next".
+
 ## From Phase 3c-2c — discover / genre browsing
 
 - **Repeated full-reloads of the proxy-through discover page hung on "Starting

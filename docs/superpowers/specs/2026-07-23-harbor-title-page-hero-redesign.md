@@ -1,4 +1,4 @@
-# Harbor — Title Page Hero Redesign
+# Harbor — Title Page Hero Redesign (Jellyfin-style)
 
 **Date:** 2026-07-23
 **Status:** Approved
@@ -12,8 +12,13 @@ then left-aligns the overview and genres far below, and — because the page is
 `min-h-screen` with nothing to fill it for a movie — leaves a large empty void
 beneath. The centred-top → left-bottom → void combination reads as unfinished.
 
-This replaces the split with a single left-aligned cinematic hero, consistent
-with the home backdrop hero, and removes the void.
+This replaces the split with a full-viewport, Jellyfin-style cinematic hero:
+a full-bleed backdrop with the title, meta, and actions centred in the lower
+middle and the overview plus genres pinned bottom-left. (An earlier iteration
+tried a left-aligned block; the user pointed at Jellyfin as the target, and the
+design was revised to match it.) The title logo image, tagline, and rating that
+round out Jellyfin's page are deferred to a follow-up -- they need provider and
+schema work -- and this ships the layout with the data Harbor has today.
 
 Presentational only. No data, endpoint, provider, or schema change. The
 season selector and episode grid (for series) are untouched except that they
