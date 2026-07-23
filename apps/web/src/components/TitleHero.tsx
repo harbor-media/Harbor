@@ -72,7 +72,8 @@ export function TitleHero({
   detail: TitleDetailResponse;
   seasonLabel: string | null;
 }): JSX.Element {
-  const meta = metaLine([detail.year, formatRuntime(detail.runtime)]);
+  const rating = detail.rating === null ? null : `★ ${detail.rating.toFixed(1)}`;
+  const meta = metaLine([detail.year, formatRuntime(detail.runtime), rating]);
 
   return (
     <section className={`relative flex ${HERO_MIN_HEIGHT} flex-col overflow-hidden`}>
@@ -87,7 +88,15 @@ export function TitleHero({
         )}
 
         <h1 className="mt-3 font-display text-5xl leading-tight tracking-tight sm:text-6xl">
-          {detail.title}
+          {detail.logoPath === null ? (
+            detail.title
+          ) : (
+            <img
+              src={imageUrl(detail.logoPath, "w500") ?? undefined}
+              alt={detail.title}
+              className="mx-auto max-h-32 w-auto max-w-full object-contain"
+            />
+          )}
         </h1>
 
         {detail.originalTitle !== null && detail.originalTitle !== detail.title ? (
@@ -125,8 +134,11 @@ export function TitleHero({
       </div>
 
       {/* Overview and genres, bottom-left. */}
-      {detail.overview !== null || detail.genres.length > 0 ? (
+      {detail.tagline !== null || detail.overview !== null || detail.genres.length > 0 ? (
         <div className="relative z-10 max-w-2xl px-8 pb-10">
+          {detail.tagline === null ? null : (
+            <p className="mb-2 text-sm text-muted-foreground italic">{detail.tagline}</p>
+          )}
           {detail.overview === null ? null : (
             <p className="text-sm text-muted-foreground">{detail.overview}</p>
           )}

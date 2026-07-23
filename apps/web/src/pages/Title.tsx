@@ -4,6 +4,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ApiError, describeMetadataError } from "../metadata";
 import { EpisodeList } from "../components/EpisodeList";
 import { SeasonSelector } from "../components/SeasonSelector";
+import { TitleDetails } from "../components/TitleDetails";
 import { TitleHero, TitleHeroSkeleton } from "../components/TitleHero";
 import { useSeasonDetail, useTitleDetail } from "../titles";
 
@@ -71,6 +72,8 @@ export function Title(): JSX.Element {
       {detail.data ? <TitleHero detail={detail.data} seasonLabel={seasonLabel} /> : null}
 
       <div className="mx-auto w-full max-w-7xl px-8">
+        {detail.data ? <TitleDetails detail={detail.data} /> : null}
+
         {detail.data && isSeries && seasons.length > 0 ? (
           <section className="mt-12">
             <SeasonSelector titleId={detail.data.id} seasons={seasons} active={active} />
