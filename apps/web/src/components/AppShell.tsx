@@ -49,7 +49,11 @@ export function AppShell(): JSX.Element {
       : "text-muted-foreground hover:text-foreground";
 
   return (
-    <div className="min-h-screen bg-background">
+    // No bg-background here: the body already paints the canvas colour, and an
+    // opaque background on this wrapper would sit in front of any page's
+    // `-z-10` backdrop (the title page's) and hide it -- which is exactly what
+    // it did until this was removed.
+    <div className="min-h-screen">
       {/* Sticky and transparent: on /home it sits over the hero backdrop, and
           the blur keeps the labels legible over whatever artwork loads. */}
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/70 backdrop-blur">

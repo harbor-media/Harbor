@@ -35,12 +35,13 @@ export function TitleBackdrop({ detail }: { detail: TitleDetailResponse }): JSX.
             : "h-full w-full object-cover"
         }
       />
-      {/* Heavy wash plus a fade to the canvas. Title and controls sit on top
-          of the artwork, and text over a raw frame is unreadable on some
-          images -- the darkening is what makes the layout survive whatever
-          the provider happens to return. */}
-      <div className="absolute inset-0 bg-background/80" />
-      <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-transparent to-background" />
+      {/* A wash for legibility -- the centred title and controls sit over the
+          artwork, and text over a raw frame is unreadable on some images --
+          plus a fade to the canvas at the bottom. Kept lighter than a full
+          blackout so the backdrop actually reads as artwork rather than a dark
+          tint, matching the home hero. */}
+      <div className="absolute inset-0 bg-background/45" />
+      <div className="absolute inset-0 bg-gradient-to-b from-background/50 via-background/10 to-background" />
     </div>
   );
 }
