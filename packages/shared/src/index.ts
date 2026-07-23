@@ -14,6 +14,7 @@ export const ERROR_CODES = [
   "METADATA_PROVIDER_UNAUTHORIZED",
   "METADATA_KEY_UNREADABLE",
   "CATALOG_KIND_UNSUPPORTED",
+  "DISCOVER_UNSUPPORTED",
   "IMAGE_UNAVAILABLE",
 ] as const;
 
@@ -309,4 +310,29 @@ export interface CatalogRowResponse {
   titles: TitleCard[];
   /** True when served without contacting the provider. */
   cached: boolean;
+}
+
+/** The two things Harbor can browse by genre. Harbor's own vocabulary --
+ *  the TMDB adapter maps "series" to TMDB's "tv". */
+export type DiscoverType = "movie" | "series";
+
+export interface Genre {
+  /** The provider's genre id as a string (TMDB's are numeric). */
+  id: string;
+  name: string;
+}
+
+export interface GenreListResponse {
+  type: DiscoverType;
+  genres: Genre[];
+  /** True when served without contacting the provider. */
+  cached: boolean;
+}
+
+export interface DiscoverResponse {
+  type: DiscoverType;
+  genreId: string;
+  page: number;
+  totalPages: number;
+  titles: TitleCard[];
 }
