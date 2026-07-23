@@ -3,6 +3,8 @@ import { getMetadataProviderConfig, saveMetadataProviderConfig } from "@harbor/d
 import {
   CATALOG_KINDS,
   type CatalogRowResponse,
+  type DiscoverResponse,
+  type GenreListResponse,
   type MetadataConfigStatus,
   type SearchResponse,
   type SeasonResponse,
@@ -13,6 +15,7 @@ import { z } from "zod";
 import { HarborError } from "../../plugins/errors.js";
 import { requireRole } from "../../plugins/require-role.js";
 import { CatalogKindUnsupportedError, fetchCatalogRow } from "./catalog.js";
+import { DiscoverUnsupportedError, fetchDiscover, fetchGenres } from "./discover.js";
 import { MetadataNotConfiguredError, tmdbFactory } from "./config.js";
 import { fetchSeasonDetail, fetchTitleDetail, TitleNotFoundError } from "./detail.js";
 import { MetadataProviderError } from "./providers/types.js";
@@ -41,6 +44,17 @@ const SeasonParamsSchema = z.object({
 // z.enum over the shared tuple, so an unknown kind is a 400 from validation
 // rather than a lookup miss deeper in the stack.
 const CatalogParamsSchema = z.object({ kind: z.enum(CATALOG_KINDS) });
+
+const DiscoverTypeSchema = z.enum(["movie", "series"]);
+const GenreParamsSchema = z.object({ type: DiscoverTypeSchema });
+const DiscoverParamsSchema = z.object({
+  type: DiscoverTypeSchema,
+  // Numeric string; TMDB genre ids are integers.
+  genreId: z.string().regex(/^\d+$/, "Genre id must be numeric."),
+});
+const DiscoverQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).max(500).default(1),
+});
 
 function toStatus(
   row: { enabled: boolean; encryptedApiKey: string | null; language: string; lastVerifiedAt: Date | null } | null,
@@ -74,6 +88,11 @@ function toHarborError(error: unknown): HarborError {
     // just cannot serve it. The client hides the row rather than showing an
     // error, and an operator reading logs sees a capability gap, not a bug.
     return new HarborError("CATALOG_KIND_UNSUPPORTED", error.message, 409);
+  }
+  if (error instanceof DiscoverUnsupportedError) {
+    // 409: browsing by genre is a real feature this installation's provider
+    // cannot offer. The page treats it as unavailable, not an error.
+    return new HarborError("DISCOVER_UNSUPPORTED", error.message, 409);
   }
   // A stored key that will not decrypt means HARBOR_SECRET changed. Left
   // unmapped this returns a generic 500, which tells an operator nothing and
@@ -230,6 +249,42 @@ export const metadataRoutes: FastifyPluginAsync = async (fastify) => {
           tmdbBaseUrl: fastify.env.HARBOR_TMDB_BASE_URL,
         },
         parsed.data.kind,
+      );
+    } catch (error) {
+      throw toHarborError(error);
+    }
+  });
+
+  fastify.get("/genres/:type", detailRateLimit, async (request): Promise<GenreListResponse> => {
+    const parsed = GenreParamsSchema.safeParse(request.params);
+    if (!parsed.success) {
+      throw new HarborError("VALIDATION_FAILED", z.prettifyError(parsed.error), 400);
+    }
+    try {
+      return await fetchGenres(
+        { db: fastify.db, harborSecret: fastify.env.HARBOR_SECRET, tmdbBaseUrl: fastify.env.HARBOR_TMDB_BASE_URL },
+        parsed.data.type,
+      );
+    } catch (error) {
+      throw toHarborError(error);
+    }
+  });
+
+  fastify.get("/discover/:type/:genreId", detailRateLimit, async (request): Promise<DiscoverResponse> => {
+    const params = DiscoverParamsSchema.safeParse(request.params);
+    const query = DiscoverQuerySchema.safeParse(request.query);
+    if (!params.success) {
+      throw new HarborError("VALIDATION_FAILED", z.prettifyError(params.error), 400);
+    }
+    if (!query.success) {
+      throw new HarborError("VALIDATION_FAILED", z.prettifyError(query.error), 400);
+    }
+    try {
+      return await fetchDiscover(
+        { db: fastify.db, harborSecret: fastify.env.HARBOR_SECRET, tmdbBaseUrl: fastify.env.HARBOR_TMDB_BASE_URL },
+        params.data.type,
+        params.data.genreId,
+        query.data.page,
       );
     } catch (error) {
       throw toHarborError(error);
