@@ -282,6 +282,15 @@ describe("detail enrichment", () => {
     expect(d.logoPath).toBe("/logo-en.png");
   });
 
+  it("falls back to the first logo when none is English", async () => {
+    const body = {
+      ...enriched,
+      images: { logos: [{ file_path: "/first-fr.png", iso_639_1: "fr" }, { file_path: "/de.png", iso_639_1: "de" }] },
+    };
+    const d = await providerFor(body).getMovie("78", "en-US", SIGNAL());
+    expect(d.logoPath).toBe("/first-fr.png");
+  });
+
   it("treats a vote_average of 0 as no rating", async () => {
     const d = await providerFor({ ...enriched, vote_average: 0 }).getMovie("78", "en-US", SIGNAL());
     expect(d.rating).toBeNull();
