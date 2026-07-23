@@ -39,6 +39,24 @@ test("home shows the catalog rows the provider can serve", async () => {
   await expect(page.getByRole("heading", { name: "New releases" })).toHaveCount(0);
 });
 
+test("the hero features the first trending title with a backdrop", async () => {
+  await page.goto("/home");
+
+  // Supernatural is first in the trending fixture, so it is the featured title.
+  // The h1 is the hero's, distinct from the row headings (which are h2).
+  await expect(page.getByRole("heading", { level: 1, name: "Supernatural" })).toBeVisible();
+
+  // The backdrop is the image in the hero section (main > section), which sits
+  // above the rows (main > div > section). naturalWidth, not visibility: a
+  // broken image still "renders" its (empty) alt to Playwright.
+  const heroBackdrop = page.locator("main > section").first().locator("img");
+  await expect
+    .poll(async () =>
+      heroBackdrop.evaluate((img) => (img as unknown as { naturalWidth: number }).naturalWidth),
+    )
+    .toBeGreaterThan(0);
+});
+
 test("a poster opens its title page", async () => {
   await page.goto("/home");
 

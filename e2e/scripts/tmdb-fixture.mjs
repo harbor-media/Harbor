@@ -89,7 +89,9 @@ const SERIES_DETAIL = {
   first_air_date: "2005-09-13",
   overview: "Two brothers hunt monsters.",
   poster_path: "/sn.jpg",
-  backdrop_path: null,
+  // Non-null so the home backdrop hero -- featured on the first trending title,
+  // which is Supernatural -- renders a real backdrop the spec can assert on.
+  backdrop_path: "/backdrop.jpg",
   episode_run_time: [44],
   genres: [{ id: 18, name: "Drama" }],
   seasons: [

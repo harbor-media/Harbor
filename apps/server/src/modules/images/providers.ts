@@ -11,12 +11,13 @@ export const IMAGE_PROVIDERS = {
     // rather than resizing, which is why it needs no native image library
     // and no arm64 build story for one.
     //
-    // This is the union of TMDB's poster and still size sets, which are not
-    // the same list -- w300 exists only for stills, and w154/w342/w500/w780
-    // only for posters. The original list held poster sizes alone, so the
-    // first episode still requested at w300 was rejected as an unsupported
-    // size and rendered as a broken image.
-    sizes: ["w92", "w154", "w185", "w300", "w342", "w500", "w780", "original"],
+    // This is the union of TMDB's poster, still, and backdrop size sets, which
+    // are not the same list -- w300 exists only for stills, w154/w342/w500/w780
+    // only for posters, and w1280 only for backdrops. The original list held
+    // poster sizes alone, so the first episode still requested at w300 was
+    // rejected as an unsupported size and rendered as a broken image; the home
+    // backdrop hero requests w1280 for the same reason.
+    sizes: ["w92", "w154", "w185", "w300", "w342", "w500", "w780", "w1280", "original"],
   },
 } as const;
 
