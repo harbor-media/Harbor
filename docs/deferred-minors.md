@@ -7,6 +7,20 @@ can judge urgency without re-deriving it.
 This file exists because these had previously been tracked only in
 conversation, where they do not survive.
 
+## From Phase 3c-2b — home catalog rows
+
+- **`CatalogRow` scroll geometry is untested.** The prev/next buttons enable
+  and disable from `scrollLeft`/`clientWidth`/`scrollWidth`, none of which
+  jsdom implements, so a component test cannot exercise them. The e2e only
+  asserts the left button is disabled at rest; the `atEnd` transition and the
+  one-pixel rounding slack have no assertion. A real browser-driven test (or a
+  Playwright test scrolling the row) would close it.
+
+- **`CatalogRow` does not re-measure on window resize.** `atStart`/`atEnd`
+  update on scroll and on new data only. After a viewport resize — a row that
+  now fits, say — the buttons can be stale (an enabled "next" with nowhere to
+  go). Cosmetic; a `resize` listener calling `measure` would fix it.
+
 ## From Phase 3a — metadata foundation
 
 - **Secondary external ids are not covered by the upsert advisory lock.**
