@@ -9,6 +9,24 @@ conversation, where they do not survive.
 
 ## From Phase 3c-2b — home catalog rows
 
+- **The e2e suite can run against a stale server `dist`.** `pnpm test:e2e`
+  starts the built server (`node ../apps/server/dist/server.js`) via turbo's
+  `^build`. When turbo restores a cached server build, the running server is
+  not the code just changed — a load-bearing check for the `w1280` allowlist
+  passed while it should have failed for exactly this reason, because the
+  server under test was a stale build. The web bundle has the analogous
+  guard (`@harbor/web#build` declares `../server/public/**`); the server dist
+  needs the same treatment, or the runner should force a clean server build.
+  Until then, server-side load-bearing proofs must be done at the unit level,
+  not trusted through the e2e.
+
+- **Visibility is not covered by `naturalWidth` assertions.** Both backdrop
+  bugs this phase (home hero, then the title page hidden by the shell) passed
+  the e2e's `naturalWidth > 0` checks — the image decoded but was painted over
+  or gradient-washed to black. A meaningful guard would assert computed
+  opacity/stacking or compare a screenshot region, neither of which the suite
+  does today. The fixes were verified by eye from e2e screenshots instead.
+
 - **`CatalogRow` scroll geometry is untested.** The prev/next buttons enable
   and disable from `scrollLeft`/`clientWidth`/`scrollWidth`, none of which
   jsdom implements, so a component test cannot exercise them. The e2e only
