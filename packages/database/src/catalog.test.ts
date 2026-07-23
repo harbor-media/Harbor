@@ -119,6 +119,18 @@ describe("saveCatalogRow and listCatalogTitles", () => {
     expect(await getCatalogFetchedAt(db, "trending")).toBeNull();
   });
 
+  it("collapses a title the provider listed twice into a single entry", async () => {
+    // A provider can return the same title twice on one page. Both items share
+    // an external id, so they resolve to one title row -- without a de-dupe the
+    // row would carry two entries for it, drawing the poster twice and handing
+    // React two children with the same key.
+    await saveCatalogRow(db, "trending", [title(1), title(2), title(1)], new Date());
+
+    const rows = await listCatalogTitles(db, "trending");
+    // First occurrence wins, so ranking order is preserved: 1 then 2.
+    expect(rows.map((r) => r.title)).toEqual(["Title 1", "Title 2"]);
+  });
+
   it("reuses the canonical title row rather than duplicating it", async () => {
     // The same title in two rows must be ONE titles row, or the detail page,
     // search, and every future library entry disagree about its identity.

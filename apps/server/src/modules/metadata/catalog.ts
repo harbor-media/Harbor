@@ -80,7 +80,7 @@ export async function fetchCatalogRow(
     throw new CatalogKindUnsupportedError(`The configured provider cannot serve "${kind}".`);
   }
 
-  let titles;
+  let titles: Awaited<ReturnType<typeof provider.getCatalog>>;
   try {
     titles = await provider.getCatalog(kind, language, AbortSignal.timeout(FETCH_TIMEOUT_MS));
   } catch (error) {

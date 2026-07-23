@@ -8,11 +8,15 @@ import { imageUrl } from "../images";
 import { ApiError } from "../metadata";
 
 /**
- * The featured title is the first entry in Trending that has a backdrop --
- * deterministic, no rotation. Random or time-of-day selection makes the page
- * change under the reader between renders and makes the e2e assertion
- * unpinnable; rotation, if it is ever wanted, is a deliberate feature with its
- * own state rather than a side effect of rendering.
+ * The featured title is simply the first entry in Trending -- deterministic,
+ * no rotation. Random or time-of-day selection makes the page change under the
+ * reader between renders and makes the e2e assertion unpinnable; rotation, if
+ * it is ever wanted, is a deliberate feature with its own state rather than a
+ * side effect of rendering.
+ *
+ * The card carries only a poster (TitleCard has no backdrop), so the artwork
+ * here is that poster blurred and darkened -- enough colour to anchor the page
+ * without the full-bleed backdrop the title page uses.
  */
 function Hero(): JSX.Element | null {
   const trending = useCatalogRow("trending");

@@ -70,6 +70,16 @@ export async function saveCatalogRow(
 ): Promise<void> {
   const titleIds = await upsertTitles(db, items);
 
+  // De-duplicated, first occurrence wins. A provider can return the same title
+  // twice in one page -- and two items with the same external id resolve to a
+  // single title row, so upsertTitles hands back that id twice. Written as-is
+  // that becomes two entries pointing at one title: the row renders the poster
+  // twice and, because position is the only thing distinguishing them, React
+  // sees two children with the same key. Keeping the first occurrence also
+  // preserves the provider's ranking, since earlier means higher-ranked.
+  const seen = new Set<string>();
+  const orderedIds = titleIds.filter((id) => (seen.has(id) ? false : (seen.add(id), true)));
+
   await db.transaction(async (tx) => {
     await tx
       .insert(catalogRows)
@@ -78,9 +88,9 @@ export async function saveCatalogRow(
 
     await tx.delete(catalogEntries).where(eq(catalogEntries.kind, kind));
 
-    if (titleIds.length > 0) {
+    if (orderedIds.length > 0) {
       await tx.insert(catalogEntries).values(
-        titleIds.map((titleId, index) => ({ kind, position: index, titleId })),
+        orderedIds.map((titleId, index) => ({ kind, position: index, titleId })),
       );
     }
   });
