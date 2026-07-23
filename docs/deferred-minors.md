@@ -7,6 +7,18 @@ can judge urgency without re-deriving it.
 This file exists because these had previously been tracked only in
 conversation, where they do not survive.
 
+## From Phase 3c-2c — discover / genre browsing
+
+- **Repeated full-reloads of the proxy-through discover page hung on "Starting
+  Harbor…".** In the e2e, a fourth sequential `page.goto` to the same
+  `/discover?...` URL left the app stuck with install/currentUser pending. Not
+  root-caused; the discover tests were consolidated to fewer navigations to
+  avoid it. A real SPA client-side-navigates without refetching the session, so
+  this is most likely a repeated-full-reload artifact rather than an app bug --
+  but if users ever report a hung Discover, the proxy-through path (each load
+  does upsertTitles in a transaction) and the DB pool under load are where to
+  look first.
+
 ## From Phase 3c-2b — home catalog rows
 
 - **The e2e suite can run against a stale server `dist`.** `pnpm test:e2e`

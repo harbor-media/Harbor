@@ -34,18 +34,20 @@ describe("AppShell", () => {
   it("keeps unbuilt destinations reachable by keyboard and explains why they are inert", () => {
     renderShell();
 
-    const discover = screen.getByRole("button", { name: /discover/i });
+    // Library is still unbuilt (Phase 4); Discover went live in 3c-2c and is a
+    // real link now, so Library is the remaining "Soon" destination.
+    const library = screen.getByRole("button", { name: /library/i });
 
     // aria-disabled, NOT the disabled attribute. A natively disabled control
     // is removed from the tab order, so a keyboard or screen-reader user never
     // reaches it and never hears why it does nothing -- the defect recorded
     // against the title page Play button in docs/deferred-minors.md. It must
     // not be reproduced here.
-    expect(discover.getAttribute("aria-disabled")).toBe("true");
-    expect(discover.hasAttribute("disabled")).toBe(false);
+    expect(library.getAttribute("aria-disabled")).toBe("true");
+    expect(library.hasAttribute("disabled")).toBe(false);
 
     // And the explanation must actually be associated with it.
-    const describedBy = discover.getAttribute("aria-describedby");
+    const describedBy = library.getAttribute("aria-describedby");
     expect(describedBy).not.toBeNull();
     expect(document.getElementById(describedBy ?? "")?.textContent).toMatch(/later phase/i);
   });
